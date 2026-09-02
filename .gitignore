@@ -28,3 +28,4 @@ bench/results/**/iter-*.png
 bench/.kernel-cache/
 __pycache__/
 *.pyc
+bench/coldboot-debug.log
