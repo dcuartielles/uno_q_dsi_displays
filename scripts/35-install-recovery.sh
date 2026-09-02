@@ -40,6 +40,9 @@ PANEL_ID="$PANEL_ID"
 TOUCH_ADDR="$TOUCH_ADDR"
 # How long to keep retrying, in seconds, measured from when the helper starts.
 RECOVER_BUDGET_SECONDS=150
+# How long to wait for the panel controller to become reachable before
+# re-asserting the backlight. Bus outages of 87s have been measured.
+BACKLIGHT_WAIT=150
 EOF
 ok "$CONF"
 
@@ -50,8 +53,10 @@ cat > "$HELPER" <<'EOF'
 # Installed by uno-q-dsi-panel. Safe to run by hand at any time.
 [ -r /etc/default/uno-q-dsi-panel ] && . /etc/default/uno-q-dsi-panel
 : "${RECOVER_BUDGET_SECONDS:=150}"
+: "${BACKLIGHT_WAIT:=150}"
 
 log() { echo "uno-q-dsi-panel: $*"; }
+have_cmd() { command -v "$1" >/dev/null 2>&1; }
 uptime_s() { cut -d. -f1 /proc/uptime; }
 
 have_touch() {
@@ -88,22 +93,68 @@ have_display() {
 # This runs unconditionally because it is harmless when the panel is already
 # lit, and we have no way to tell whether it is.
 # ---------------------------------------------------------------------------
+# The panel controller's own I2C bus number is not stable across boots, so
+# find it from sysfs rather than assuming - it has been 0, 1 and 2 on this
+# board on different boots.
+attiny_bus() {
+    ls -d /sys/bus/i2c/devices/*-0045 2>/dev/null | head -1         | sed 's#.*/##; s/-.*//'
+}
+
+# Is the controller actually reachable? REG_ID (0x80) is a harmless read.
+#
+# This is the part the first version of this fix was missing. It re-asserted
+# the backlight on a fixed timer, and on a bad boot that landed while the bus
+# was still down - so the write failed exactly like the boot-time ones and the
+# panel stayed dark. Probing first turns "hope the bus is back" into "know it
+# is back".
+attiny_reachable() {
+    b=$(attiny_bus)
+    [ -n "$b" ] || return 1
+    i2ctransfer -y -f "$b" w1@0x45 0x80 r1 >/dev/null 2>&1
+}
+
 restore_backlight() {
     for bl in /sys/class/backlight/*/; do
         [ -d "$bl" ] || continue
         max=$(cat "$bl/max_brightness" 2>/dev/null) || continue
         cur=$(cat "$bl/brightness" 2>/dev/null)
-        # Writing through sysfs always calls update_status, even when the value
-        # is unchanged - which is exactly what we need here.
-        [ -n "$cur" ] && [ "$cur" -gt 0 ] 2>/dev/null             && printf '%s' "$cur" > "$bl/brightness" 2>/dev/null             || printf '%s' "$max" > "$bl/brightness" 2>/dev/null
-        log "re-asserted backlight $(basename "$bl") (brightness ${cur:-$max})"
+        v=${cur:-$max}
+        [ "$v" -gt 0 ] 2>/dev/null || v=$max
+        # Unblank first: backlight_get_brightness() returns 0 while the device
+        # is blanked, so writing brightness alone would push PWM=0 and leave
+        # the panel dark no matter how healthy the bus is.
+        printf '0' > "$bl/bl_power" 2>/dev/null
+        # Writing through sysfs always calls update_status even when the value
+        # is unchanged, which is exactly what we need.
+        printf '%s' "$v" > "$bl/brightness" 2>/dev/null
+        log "re-asserted backlight $(basename "$bl") (brightness $v)"
     done
 }
 
 if dmesg 2>/dev/null | grep -q 'attiny:.*failed'; then
     log "panel controller writes FAILED during boot - the screen is probably dark"
 fi
-restore_backlight
+
+# Wait for the controller to answer before touching it, then re-assert. Give
+# it a generous window: measured bus outages have run to 87s from power-on.
+if have_cmd i2ctransfer; then
+    waited=0
+    while [ "$waited" -lt "$BACKLIGHT_WAIT" ]; do
+        attiny_reachable && break
+        sleep 3
+        waited=$((waited + 3))
+    done
+    if attiny_reachable; then
+        [ "$waited" -gt 0 ] && log "panel controller answered after ${waited}s"
+        restore_backlight
+    else
+        log "WARNING: panel controller still unreachable after ${waited}s"
+        restore_backlight
+    fi
+else
+    log "i2ctransfer not installed - re-asserting the backlight blind"
+    restore_backlight
+fi
 
 if have_display; then
     log "display is up"

@@ -121,6 +121,46 @@ def wait_for_board(deadline_s, poll=5.0):
     return None
 
 
+def get_boot_id():
+    """The kernel's random boot_id, which changes on every boot."""
+    try:
+        rc, out, _ = remote("cat /proc/sys/kernel/random/boot_id", timeout=20)
+        if rc == 0 and out.strip():
+            return out.strip().splitlines()[-1].strip()
+    except Exception:
+        pass
+    return None
+
+
+def wait_for_new_boot(prev_boot_id, cap=3600.0, poll=5.0,
+                      resignal=None, resignal_every=60.0):
+    """Wait until the board reports a DIFFERENT boot_id.
+
+    This replaces watching for the board to disappear and come back, which was
+    fragile for a reason worth recording: the re-signal makes SSH calls, and if
+    one fired just as the operator pulled the plug it could block for its full
+    timeout. The board then went down AND came back inside that blind window,
+    so the down-transition was never observed and the wait never ended.
+
+    Watching a state instead of a transition cannot miss anything. A changed
+    boot_id is positive proof that a fresh boot happened, however briefly we
+    looked away.
+    """
+    start = time.time()
+    last_signal = time.time()
+    while time.time() - start < cap:
+        current = get_boot_id()
+        if current and current != prev_boot_id:
+            return time.time() - start
+        if current and resignal and time.time() - last_signal > resignal_every:
+            # Still the old boot, so the operator has not cycled yet - remind
+            # them. Safe here because we know the board is answering.
+            resignal()
+            last_signal = time.time()
+        time.sleep(poll)
+    return None
+
+
 def wait_for_gone(cap=900.0, poll=3.0, resignal=None, resignal_every=60.0):
     """Wait until the board stops answering, i.e. someone pulled the power.
 
@@ -189,7 +229,7 @@ def set_leds(colour=None):
                "echo 400 > $d/delay_on 2>/dev/null; "
                "echo 400 > $d/delay_off 2>/dev/null; done" % colour)
     try:
-        remote(cmd, timeout=45)
+        remote(cmd, timeout=15)
         return True
     except Exception:
         return False
@@ -205,8 +245,11 @@ def signal_operator(colour="green"):
     """
     leds = set_leds(colour)
     try:
+        # Short timeout on purpose. A long one here once blocked for its full
+        # duration while the operator pulled the plug, hiding the whole power
+        # cycle from the detector.
         rc, _, _ = remote("/home/arduino/bench/panel-pattern.sh %s 255" % colour,
-                          timeout=45)
+                          timeout=15)
         return rc == 0 or leds
     except Exception:
         return leds
@@ -266,16 +309,11 @@ class Power:
             signal_operator("green")
             log("[%d/%d] SIGNAL GREEN - unplug the board now, then plug it "
                 "back in" % (i, total))
-            waited = wait_for_gone(self.unplug_timeout,
-                                   resignal=lambda: signal_operator("green"))
-            if waited is None:
-                raise TimeoutError("board never went away - was it unplugged?")
-            log("[%d/%d] power-down detected after %.0fs" % (i, total, waited))
-            return waited
-        # Already off - the operator unplugged before we got here, or the
-        # previous boot never came up. Either way there is nothing to wait for.
-        log("[%d/%d] board already down; waiting for it to come back"
-            % (i, total))
+        else:
+            log("[%d/%d] board is down already; waiting for it to come back"
+                % (i, total))
+        # The waiting is done by run_iteration, which watches for a new
+        # boot_id. Nothing here can miss the power cycle.
         return 0.0
 
 
@@ -313,6 +351,7 @@ def run_iteration(i, total, args, power, outdir):
     rec = {"iteration": i,
            "started": datetime.datetime.now().isoformat(timespec="seconds")}
 
+    prev_boot = get_boot_id() if not args.prompt else None
     try:
         human_s = power.cycle(i, total, detect=not args.prompt)
     except TimeoutError as exc:
@@ -322,8 +361,15 @@ def run_iteration(i, total, args, power, outdir):
     rec["waited_for_operator_s"] = round(human_s, 1)
     t0 = time.time()
 
-    log("[%d/%d] waiting for the board to come back up" % (i, total))
-    waited = wait_for_board(args.boot_timeout)
+    if prev_boot is not None:
+        log("[%d/%d] waiting for a NEW boot (previous boot_id %s)"
+            % (i, total, prev_boot[:8]))
+        waited = wait_for_new_boot(
+            prev_boot, cap=args.unplug_timeout + args.boot_timeout,
+            resignal=lambda: signal_operator("green"))
+    else:
+        log("[%d/%d] waiting for the board to come back up" % (i, total))
+        waited = wait_for_board(args.boot_timeout)
     rec["ssh_wait_s"] = round(waited, 1) if waited is not None else None
     if waited is not None:
         log("[%d/%d] board up after %.0fs; measuring (LEDs off)"
