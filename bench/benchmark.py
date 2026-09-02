@@ -240,16 +240,24 @@ def wait_for_recovery(cap=180.0, poll=5.0):
     boot as failed that the system was about to fix by itself. Polling the
     unit's state is both faster and more accurate.
     """
+    rc, out, _ = remote(
+        "systemctl is-enabled uno-q-dsi-panel-recover.service 2>/dev/null "
+        "|| echo missing", timeout=20)
+    enabled = "enabled" in (out or "")
+
     start = time.time()
     while time.time() - start < cap:
         rc, out, _ = remote(
             "systemctl show -p ActiveState --value uno-q-dsi-panel-recover "
             "2>/dev/null || echo missing", timeout=20)
         state = (out or "").strip().splitlines()[-1] if out.strip() else "missing"
-        # "inactive" matters: when testing the driver fix the recovery service
-        # is deliberately disabled, and without this every iteration would sit
-        # here for the full cap waiting for a unit that will never run.
-        if state in ("active", "failed", "missing", "inactive"):
+        # "inactive" is ambiguous and must be read in context. When the unit is
+        # DISABLED it means "will never run", so waiting would burn the whole
+        # cap. When the unit is ENABLED it means "has not started yet", and
+        # returning here would measure the panel before the rescue happens and
+        # record a false failure. So only trust it when the unit is disabled.
+        done = ("active", "failed", "missing")
+        if state in done or (state == "inactive" and not enabled):
             return time.time() - start
         time.sleep(poll)
     return None
@@ -300,22 +308,35 @@ def signal_operator(colour="green"):
         return leds
 
 
-def optical_check(camera, expect="image", save=None):
+def optical_check(camera, expect="image", save=None, attempts=3):
+    """Capture and judge the panel, retrying if the camera will not open.
+
+    Webcams intermittently fail to open on Windows (DSHOW returns "backend is
+    generally available but can't be used to capture by index"). That is a host
+    hiccup, not a result, and without a retry it throws away an iteration the
+    operator paid for with a power cycle.
+    """
     cmd = [sys.executable, os.path.join(HERE, "optical.py"), "check",
            "--expect", expect]
     if camera is not None:
         cmd += ["--camera", str(camera)]
     if save:
         cmd += ["--save", save]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    for line in r.stdout.splitlines():
-        line = line.strip()
-        if line.startswith("{"):
-            try:
-                return json.loads(line)
-            except ValueError:
-                pass
-    return {"error": (r.stderr or r.stdout or "no output").strip()[:300]}
+    last = "no output"
+    for attempt in range(attempts):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        for line in r.stdout.splitlines():
+            line = line.strip()
+            if line.startswith("{"):
+                try:
+                    return json.loads(line)
+                except ValueError:
+                    pass
+        last = (r.stderr or r.stdout or "no output").strip()[:300]
+        if attempt + 1 < attempts:
+            log("  camera did not open, retrying (%d/%d)" % (attempt + 1, attempts))
+            time.sleep(4)
+    return {"error": last}
 
 
 # ----------------------------------------------------------------- power ---

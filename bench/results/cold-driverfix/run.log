@@ -12,3 +12,15 @@
 23:49:18  [3/10] recovery settled after 1s; capturing the panel
 23:49:39  [4/10] SIGNAL GREEN - unplug the board now, then plug it back in
 23:49:39  [4/10] waiting for a NEW boot (previous boot_id aa8ee632)
+23:50:51  [4/10] board up after 72s; measuring (LEDs off)
+23:50:54  [4/10] recovery settled after 1s; capturing the panel
+23:51:16  [5/10] SIGNAL GREEN - unplug the board now, then plug it back in
+23:51:16  [5/10] waiting for a NEW boot (previous boot_id 9099a774)
+23:52:34  [5/10] board up after 78s; measuring (LEDs off)
+23:52:38  [5/10] recovery settled after 3s; capturing the panel
+23:52:59  [6/10] SIGNAL GREEN - unplug the board now, then plug it back in
+23:52:59  [6/10] waiting for a NEW boot (previous boot_id 734aa7d9)
+23:59:01  [6/10] board up after 362s; measuring (LEDs off)
+23:59:11  [6/10] recovery settled after 8s; capturing the panel
+23:59:33  [7/10] SIGNAL GREEN - unplug the board now, then plug it back in
+23:59:33  [7/10] waiting for a NEW boot (previous boot_id a94d1748)

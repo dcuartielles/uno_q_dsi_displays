@@ -1,15 +1,15 @@
 {
-  "run_id": "cold-driverfix",
+  "run_id": "cold-combined",
   "suite": "boot",
-  "iterations": 5,
-  "started": "2026-09-02T23:44:07",
+  "iterations": 8,
+  "started": "2026-09-03T00:01:16",
   "manual_power": true,
-  "notes": "DRIVER FIX ONLY, recovery service disabled. Iterations 6+ were discarded: a second benchmark run was accidentally left running and the recovery service was re-enabled mid-run.",
+  "notes": "COMBINED: driver fix + fast recovery service (8s start, PWM re-assert x3). Baseline 1/6; driver-fix-only 4/5",
   "baseline": {
-    "boot_id": "7358d906-5253-4f12-84ac-9001e5329f87",
+    "boot_id": "a94d1748-0a11-4cf3-877f-5cf19376ad1a",
     "model": "Arduino UnoQ",
     "kernel": "7.0.0-g122c2c22d838",
-    "uptime_s": 349,
+    "uptime_s": 171,
     "connector": "card0-DSI-1",
     "mode": "800x480",
     "fb0": 1,
@@ -21,14 +21,14 @@
     "driver_panel": "panel-simple-dsi",
     "driver_attiny": "rpi_touchscreen_attiny",
     "driver_touch": "edt_ft5x06",
-    "cci_timeouts": 2,
-    "attiny_write_failures": 2,
+    "cci_timeouts": 17,
+    "attiny_write_failures": 4,
     "dsi_errors": 0,
     "touch_probe_failures": 0,
     "backlight_enable_failed": 0,
-    "touch_bound_at_s": 12.205158,
-    "first_cci_timeout_s": 7.873778,
-    "last_cci_timeout_s": 8.201785,
+    "touch_bound_at_s": 12.04417,
+    "first_cci_timeout_s": 7.810353,
+    "last_cci_timeout_s": 9.898351,
     "recovery_ran": 0,
     "recovery_succeeded": 0,
     "software_ok": 1
@@ -37,17 +37,17 @@
     "red": {
       "seen": "red",
       "ok": true,
-      "contrast": 1.144
+      "contrast": 1.139
     },
     "green": {
       "seen": "green",
       "ok": true,
-      "contrast": 3.65
+      "contrast": 3.566
     },
     "blue": {
-      "seen": "blue",
-      "ok": true,
-      "contrast": 1.61
+      "seen": "red",
+      "ok": false,
+      "contrast": 0.159
     }
   }
 }

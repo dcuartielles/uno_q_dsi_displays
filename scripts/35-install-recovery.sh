@@ -146,11 +146,19 @@ if have_cmd i2ctransfer; then
     done
     if attiny_reachable; then
         [ "$waited" -gt 0 ] && log "panel controller answered after ${waited}s"
-        restore_backlight
     else
         log "WARNING: panel controller still unreachable after ${waited}s"
-        restore_backlight
     fi
+    # Re-assert several times over a short window. The display pipeline may
+    # enable the panel just after our first attempt, and REG_PWM writes are
+    # cheap and - unlike REG_PORTC - completely safe to repeat: measured 0
+    # failures in 32 writes, and they never wedge the bus.
+    n=0
+    while [ "$n" -lt 3 ]; do
+        restore_backlight
+        n=$((n + 1))
+        [ "$n" -lt 3 ] && sleep 6
+    done
 else
     log "i2ctransfer not installed - re-asserting the backlight blind"
     restore_backlight
@@ -206,8 +214,11 @@ After=multi-user.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-# Let the boot-time I2C storm pass before looking.
-ExecStartPre=/bin/sleep 25
+# Was 25s, to let a boot-time I2C storm pass. With the PORTC retry storm gone
+# the bus is healthy from the start, so the repair can happen far sooner - the
+# difference between a panel that is black for a minute and one that is black
+# for a few seconds.
+ExecStartPre=/bin/sleep 8
 ExecStart=$HELPER
 
 [Install]

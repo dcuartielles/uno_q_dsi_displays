@@ -104,6 +104,93 @@ service is the pragmatic fix, not the right one.
 
 ---
 
+## Root cause, and the driver fix
+
+The "correction" below was itself wrong, and the truth turned out to be
+uncomfortable: **we were causing most of this ourselves.**
+
+With the attiny driver blacklisted, a boot that would normally fail shows
+**zero** CCI timeouts and every device on the bus answering from 8 seconds.
+Merely loading the module drives that to 87 on demand. Measured per 32 writes:
+
+| register | failures | bus afterwards |
+| --- | --- | --- |
+| `PWM` | 0 | fine |
+| `PORTB` | 0 | fine |
+| `PORTA` | 6 | fine |
+| **`PORTC`** | **29** | **wedged** |
+
+`PORTC` *reads* are completely safe. `PORTC` **writes** fail 50-90% of the
+time, and as few as **four writes with two failures** wedge the entire CCI bus
+for ~85 seconds - taking the backlight PWM write and the touch probe down with
+it. The dark panel and the missing touchscreen were never separate faults; they
+were collateral damage.
+
+And two of our own patches were feeding it: the attiny retry loop turned a
+handful of failed writes into 100+, and the touch identify-retry pulsed the
+reset line, which is a GPIO on the panel controller driven over the same bus -
+two more `PORTC` writes per pulse, ~60 per probe. Raspberry Pi's driver, diffed
+against ours, does exactly one write per port change and discards the error.
+Same regmap config, same probe, same 5-10ms spacing. The difference is the I2C
+controller: Broadcom tolerates it, Qualcomm's CCI does not. Spacing is not the
+answer either - 50ms and 200ms gaps both still wedged the bus.
+
+**The fix:** `PORTC` gets exactly one attempt, never retried. Other registers
+keep a small retry. Touch identify retries no longer touch the reset line.
+
+### Measured, cold boots, counting only boots that hit the bug
+
+| configuration | bug-hit boots ending lit | how |
+| --- | --- | --- |
+| no fix | **0/5** | - |
+| recovery service only | 6/6 | rescued at ~63 s |
+| driver fix only | 3/4 | **lit at boot** |
+| **driver fix + fast service** | **7/7** | 4 lit at boot, 3 rescued at ~38 s |
+
+```
+no fix vs driver fix + service, bug-hit boots: 5/5 dark vs 0/7 dark
+Fisher exact two-tailed p = 0.00126
+```
+
+Full run of 8 cold boots with both fixes - 8/8 passed:
+
+```
+iter  cci    attiny  outcome
+1     16     3       lit at boot
+2     1      2       lit at boot
+3     132    4       rescued
+4     17     4       lit at boot
+5     0      0       lit at boot
+6     159    9       rescued
+7     141    8       rescued
+8     160    9       rescued
+```
+
+The split matters more than the 8/8. **Both layers do real work:** the driver
+fix handles the light cases (2-4 lost writes, `cci` 0-17, panel lights at
+boot); the service catches the heavy ones (4-9 lost writes including
+`PC_LED_EN`, so the panel really is dark and gets repaired at ~38 s). Neither
+alone reaches 8/8 - the driver-fix-only run failed exactly once, on a lost
+`PC_LED_EN` write.
+
+Note the high `cci` counts on rescued boots are largely **the service's own
+polling** while it waits for the controller to answer, not additional faults.
+With the service enabled, `cci_timeouts` is no longer a clean measure of bus
+health.
+
+Touch improved independently: it now binds at **12 s on the first probe**,
+instead of failing and being reloaded at 99 s.
+
+### Still not solved
+
+`PORTC` writes still fail 50-90% of the time. We stopped amplifying that into a
+bus-wide outage, and we repair the one consequence that matters, but **why the
+attiny mishandles PORTC writes on CCI is unexplained**. The genuinely correct
+fix is a deferred `REG_PWM` re-assert inside the driver, which would remove the
+userspace service entirely and light the panel in seconds rather than 38.
+
+---
+
 ## Correction: "the CCI bus is dead" is probably wrong
 
 Most of this work described the failure as the CCI I2C bus dying for the first
