@@ -1,0 +1,53 @@
+{
+  "run_id": "cold-fixed",
+  "suite": "boot",
+  "iterations": 10,
+  "started": "2026-09-02T21:40:02",
+  "host": "192.168.50.61",
+  "manual_power": true,
+  "notes": "AFTER FIX: recovery service re-asserts backlight. Compare to cold20 (1/6 pass)",
+  "baseline": {
+    "boot_id": "d16fe382-a090-4219-b2bc-988daaf3dce7",
+    "model": "Arduino UnoQ",
+    "kernel": "7.0.0-g122c2c22d838",
+    "uptime_s": 516,
+    "connector": "card0-DSI-1",
+    "mode": "800x480",
+    "fb0": 1,
+    "fb_size": "800,480",
+    "backlight": "2-0045",
+    "backlight_brightness": 255,
+    "touch_present": 1,
+    "touch_name": "generic ft5x06 (79)",
+    "driver_panel": "panel-simple-dsi",
+    "driver_attiny": "rpi_touchscreen_attiny",
+    "driver_touch": "edt_ft5x06",
+    "cci_timeouts": 232,
+    "attiny_write_failures": 8,
+    "dsi_errors": 0,
+    "touch_probe_failures": 1,
+    "touch_bound_at_s": 71.463137,
+    "first_cci_timeout_s": 7.869615,
+    "last_cci_timeout_s": 39.225624,
+    "recovery_ran": 1,
+    "recovery_succeeded": 1,
+    "software_ok": 1
+  },
+  "colour_sweep": {
+    "red": {
+      "seen": "red",
+      "ok": true,
+      "contrast": 1.884
+    },
+    "green": {
+      "seen": "green",
+      "ok": true,
+      "contrast": 6.372
+    },
+    "blue": {
+      "seen": "blue",
+      "ok": true,
+      "contrast": 2.59
+    }
+  }
+}

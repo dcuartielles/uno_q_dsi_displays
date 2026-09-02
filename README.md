@@ -150,6 +150,29 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ---
 
+## Cold boots: known behaviour
+
+On this hardware, roughly **3 cold boots in 4** hit a Qualcomm CCI I2C fault
+that stops the panel controller's backlight write. The picture is rendered
+correctly the whole time; the screen just is not lit. `install.sh` installs a
+recovery service that waits for the controller to answer and re-asserts the
+backlight - measured at **63 seconds** into boot on an affected boot.
+
+So expect the panel to be **black for about a minute after a cold boot**, then
+come up. Measured effect, counting only boots that hit the bug:
+
+| | panel dark | panel working |
+| --- | --- | --- |
+| without the service | 5 | 0 |
+| with the service | 0 | 6 |
+
+This is a workaround, not a cure: the driver bug is untouched and the proper
+fix belongs in its enable path. Full method and numbers, including how it was
+measured with a camera because no software check can see it, are in
+[bench/RESULTS.md](bench/RESULTS.md).
+
+---
+
 ## What gets changed
 
 | Change | Where | Reverted by |

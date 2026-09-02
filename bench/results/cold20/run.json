@@ -1,0 +1,53 @@
+{
+  "run_id": "cold20",
+  "suite": "boot",
+  "iterations": 20,
+  "started": "2026-09-02T21:16:15",
+  "host": "192.168.50.61",
+  "manual_power": true,
+  "notes": "N=20 full power cycle, manual, kernel 7.0.0-g122c2c22d838, external PSU",
+  "baseline": {
+    "boot_id": "6bb14111-e943-4b03-b0db-de8c93361045",
+    "model": "Arduino UnoQ",
+    "kernel": "7.0.0-g122c2c22d838",
+    "uptime_s": 754,
+    "connector": "card0-DSI-1",
+    "mode": "800x480",
+    "fb0": 1,
+    "fb_size": "800,480",
+    "backlight": "0-0045",
+    "backlight_brightness": 255,
+    "touch_present": 1,
+    "touch_name": "generic ft5x06 (79)",
+    "driver_panel": "panel-simple-dsi",
+    "driver_attiny": "rpi_touchscreen_attiny",
+    "driver_touch": "edt_ft5x06",
+    "cci_timeouts": 0,
+    "attiny_write_failures": 0,
+    "dsi_errors": 0,
+    "touch_probe_failures": 0,
+    "touch_bound_at_s": 12.037746,
+    "first_cci_timeout_s": null,
+    "last_cci_timeout_s": null,
+    "recovery_ran": 1,
+    "recovery_succeeded": 1,
+    "software_ok": 1
+  },
+  "colour_sweep": {
+    "red": {
+      "seen": "red",
+      "ok": true,
+      "contrast": 2.019
+    },
+    "green": {
+      "seen": "green",
+      "ok": true,
+      "contrast": 6.609
+    },
+    "blue": {
+      "seen": "blue",
+      "ok": true,
+      "contrast": 2.787
+    }
+  }
+}

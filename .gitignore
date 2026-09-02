@@ -22,7 +22,9 @@ id_*
 known_hosts
 bench/bench.conf
 bench/optical-cal.json
-bench/results/
+# Benchmark records are evidence and ARE committed; the bulky
+# per-iteration camera frames are not (evidence/ is kept).
+bench/results/**/iter-*.png
 bench/.kernel-cache/
 __pycache__/
 *.pyc

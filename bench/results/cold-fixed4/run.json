@@ -1,0 +1,53 @@
+{
+  "run_id": "cold-fixed4",
+  "suite": "boot",
+  "iterations": 10,
+  "started": "2026-09-02T22:13:32",
+  "host": "192.168.50.61",
+  "manual_power": true,
+  "notes": "FIX v2 + harness remote() no longer uses pipes. Baseline before fix: 1/6",
+  "baseline": {
+    "boot_id": "61f0dea1-78ae-4053-88dc-d89f731cdf0a",
+    "model": "Arduino UnoQ",
+    "kernel": "7.0.0-g122c2c22d838",
+    "uptime_s": 395,
+    "connector": "card0-DSI-1",
+    "mode": "800x480",
+    "fb0": 1,
+    "fb_size": "800,480",
+    "backlight": "2-0045",
+    "backlight_brightness": 255,
+    "touch_present": 1,
+    "touch_name": "generic ft5x06 (79)",
+    "driver_panel": "panel-simple-dsi",
+    "driver_attiny": "rpi_touchscreen_attiny",
+    "driver_touch": "edt_ft5x06",
+    "cci_timeouts": 0,
+    "attiny_write_failures": 0,
+    "dsi_errors": 0,
+    "touch_probe_failures": 0,
+    "touch_bound_at_s": 11.875736,
+    "first_cci_timeout_s": null,
+    "last_cci_timeout_s": null,
+    "recovery_ran": 1,
+    "recovery_succeeded": 1,
+    "software_ok": 1
+  },
+  "colour_sweep": {
+    "red": {
+      "seen": "red",
+      "ok": true,
+      "contrast": 1.82
+    },
+    "green": {
+      "seen": "green",
+      "ok": true,
+      "contrast": 6.195
+    },
+    "blue": {
+      "seen": "blue",
+      "ok": true,
+      "contrast": 2.476
+    }
+  }
+}

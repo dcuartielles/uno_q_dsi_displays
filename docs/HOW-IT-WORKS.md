@@ -115,6 +115,32 @@ the same. This one cost hours of chasing a phantom.
 
 ## The fourth piece: a recovery service
 
+**Measured:** without it, 5 of 6 cold boots came up with the panel black while
+every software check reported the display healthy. With it, 6 of 6 boots that
+hit the bug came up working (Fisher exact p = 0.0022). Full numbers and method
+in [../bench/RESULTS.md](../bench/RESULTS.md).
+
+The failure is narrower than it looks. On a cold boot the CCI bus is dead for
+the first 30-90 seconds and the controller's writes fail - but the DSI link,
+the panel resets and the rendered image all survive. The only casualty is the
+backlight PWM, so the screen is dark while showing a perfectly good picture.
+
+Software cannot see this. DRM reports a connected connector scanning out a
+framebuffer; the controller's registers do not read back. It took a camera to
+find it, which is what `bench/` exists for.
+
+The service waits for the controller to answer over I2C - `REG_ID` is a
+harmless read - and only then re-asserts the backlight. An earlier version did
+it on a fixed timer and failed, because the timer expired while the bus was
+still down; it logged success while the screen stayed black.
+
+**This is a workaround, not the right fix.** The panel is still dark for about
+a minute (measured: 63 s), and the proper fix belongs in the driver's enable
+path, retrying REG_PWM until the controller answers rather than giving up after
+ten tight attempts.
+
+
+
 Not a patch, a workaround. On some boots the CCI I²C bus is dead for the first
 minute — every transfer to `0x45` and `0x38` returns `-ETIMEDOUT`, hundreds of
 `master 0 queue 0 timeout` lines appear, and the drivers give up. On other

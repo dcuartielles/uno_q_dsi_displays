@@ -1,0 +1,52 @@
+{
+  "iteration": 2,
+  "started": "2026-09-02T21:19:51",
+  "waited_for_operator_s": 34.7,
+  "ssh_wait_s": 58.6,
+  "recovery_wait_s": 39.93687105178833,
+  "software": {
+    "boot_id": "0746f272-354e-4b1e-9382-c2b3bf3cb86d",
+    "model": "Arduino UnoQ",
+    "kernel": "7.0.0-g122c2c22d838",
+    "uptime_s": 113,
+    "connector": "card0-DSI-1",
+    "mode": "800x480",
+    "fb0": 1,
+    "fb_size": "800,480",
+    "backlight": "0-0045",
+    "backlight_brightness": 255,
+    "touch_present": 1,
+    "touch_name": "generic ft5x06 (79)",
+    "driver_panel": "panel-simple-dsi",
+    "driver_attiny": "rpi_touchscreen_attiny",
+    "driver_touch": "edt_ft5x06",
+    "cci_timeouts": 328,
+    "attiny_write_failures": 15,
+    "dsi_errors": 0,
+    "touch_probe_failures": 2,
+    "touch_bound_at_s": 98.724082,
+    "first_cci_timeout_s": 7.798459,
+    "last_cci_timeout_s": 87.302482,
+    "recovery_ran": 1,
+    "recovery_succeeded": 1,
+    "software_ok": 1,
+    "touch_expected": true
+  },
+  "optical": {
+    "state": "dark",
+    "has_image": false,
+    "contrast": 0.166,
+    "edge": 0.011,
+    "rgb": [
+      3.1,
+      0.0,
+      2.1
+    ],
+    "dominant_colour": "red",
+    "pass": false,
+    "frame": "C:\\Users\\dcuar\\Documents\\development\\arduino\\uno_q_screen\\bench\\results\\cold20\\iter-002.png"
+  },
+  "total_s": 120.0,
+  "verdict": "fail_dark_panel",
+  "note": "pipeline is up but the panel shows dark"
+}

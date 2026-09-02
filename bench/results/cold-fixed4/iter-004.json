@@ -1,0 +1,51 @@
+{
+  "iteration": 4,
+  "started": "2026-09-02T22:22:09",
+  "waited_for_operator_s": 0.0,
+  "ssh_wait_s": 69.0,
+  "recovery_wait_s": 41.01476168632507,
+  "software": {
+    "boot_id": "219ad502-ef8e-475a-bca1-8c14bdd08447",
+    "model": "Arduino UnoQ",
+    "kernel": "7.0.0-g122c2c22d838",
+    "uptime_s": 100,
+    "connector": "card0-DSI-1",
+    "mode": "800x480",
+    "fb0": 1,
+    "fb_size": "800,480",
+    "backlight": "2-0045",
+    "backlight_brightness": 255,
+    "touch_present": 1,
+    "touch_name": "generic ft5x06 (79)",
+    "driver_panel": "panel-simple-dsi",
+    "driver_attiny": "rpi_touchscreen_attiny",
+    "driver_touch": "edt_ft5x06",
+    "cci_timeouts": 174,
+    "attiny_write_failures": 12,
+    "dsi_errors": 0,
+    "touch_probe_failures": 2,
+    "touch_bound_at_s": 81.954807,
+    "first_cci_timeout_s": 8.098311,
+    "last_cci_timeout_s": 70.534372,
+    "recovery_ran": 1,
+    "recovery_succeeded": 1,
+    "software_ok": 1,
+    "touch_expected": true
+  },
+  "optical": {
+    "state": "lit",
+    "has_image": true,
+    "contrast": 2.139,
+    "edge": 5.115,
+    "rgb": [
+      5.2,
+      16.8,
+      32.0
+    ],
+    "dominant_colour": "blue",
+    "pass": true
+  },
+  "total_s": 129.6,
+  "verdict": "pass",
+  "note": ""
+}

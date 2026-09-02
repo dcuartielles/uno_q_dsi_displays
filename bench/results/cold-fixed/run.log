@@ -1,0 +1,9 @@
+21:41:06  [1/10] SIGNAL GREEN - unplug the board now, then plug it back in
+21:41:35  [1/10] power-down detected after 29s
+21:41:35  [1/10] waiting for the board to come back up
+21:42:34  [1/10] board up after 59s; measuring (LEDs off)
+21:42:49  [1/10] recovery settled after 14s; capturing the panel
+21:43:12  [2/10] SIGNAL GREEN - unplug the board now, then plug it back in
+21:43:41  [2/10] power-down detected after 29s
+21:43:41  [2/10] waiting for the board to come back up
+21:44:20  [2/10] board up after 39s; measuring (LEDs off)

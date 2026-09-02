@@ -74,6 +74,40 @@ re-run `install.sh`.
 
 ---
 
+## The panel is black for the first minute after a cold boot
+
+**Expected, and it repairs itself.** Measured on this hardware: on roughly 3
+cold boots in 4, the panel controller's writes fail during boot and the
+backlight PWM never gets set. The picture is being rendered correctly the whole
+time - the screen just is not lit.
+
+`uno-q-dsi-panel-recover.service` waits for the controller to answer over I2C
+and then re-asserts the backlight. On a measured bad boot that happened at
+**63 seconds**. Check what it did:
+
+```bash
+journalctl -u uno-q-dsi-panel-recover -b
+```
+
+A rescued boot looks like:
+
+```
+panel controller writes FAILED during boot - the screen is probably dark
+re-asserted backlight 0-0045 (brightness 255)
+```
+
+If the panel is still black well after that, the backlight is not the problem -
+work through the entries below.
+
+Measured effect, bad boots only (see [../bench/RESULTS.md](../bench/RESULTS.md)):
+
+| | panel dark | panel working |
+| --- | --- | --- |
+| without the service | 5 | 0 |
+| with the service | 0 | 6 |
+
+---
+
 ## It works on some boots and not others
 
 This one is real, and it is the reason `install.sh` also installs a recovery
