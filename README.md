@@ -187,6 +187,7 @@ scripts/40-verify.sh          post-reboot checks
 scripts/test-display.sh       colour bars on the panel
 scripts/test-touch.sh         report touch events
 tools/                        generators and kernel-source patchers
+bench/                        reliability benchmark (camera + cold boots)
 docs/                         adding a panel, how it works, troubleshooting
 dev-log/                      the original investigation, warts and all
 ```
