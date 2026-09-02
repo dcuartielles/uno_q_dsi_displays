@@ -62,6 +62,14 @@ TOUCH_PROBE_FAIL=$(dmesg 2>/dev/null | grep -c 'edt_ft5x06.*probe failed')
 # The kernel says so explicitly when the backlight write fails, which is
 # the software-visible half of the dark-panel bug.
 BL_ENABLE_FAIL=$(dmesg 2>/dev/null | grep -c 'failed to enable backlight')
+# Who repaired a lost backlight write? The driver logs "attiny: backlight
+# re-asserted"; the userspace service logs "re-asserted backlight <dev>". They
+# are deliberately distinguishable, because "it ended up lit" is not the same
+# claim as "the driver fixed it in four seconds".
+DRV_REASSERT=$(dmesg 2>/dev/null | grep -c 'attiny: backlight re-asserted')
+DRV_REASSERT_T=$(dmesg 2>/dev/null | grep 'attiny: backlight re-asserted' | head -1 | tr -d '[]' | awk '{print $1}')
+SVC_REASSERT=0
+journalctl -u uno-q-dsi-panel-recover -b --no-pager -o cat 2>/dev/null     | grep -qE 're-asserted backlight' && SVC_REASSERT=1
 
 # When the touch driver bound, and whether the recovery service had to step in.
 TOUCH_PROBE_T=$(dmesg 2>/dev/null | sed -n 's/^\[ *\([0-9.]*\)\].*edt_ft5x06.*no IRQ, polling.*/\1/p' | head -1)
@@ -102,6 +110,9 @@ cat <<EOF
   "dsi_errors": ${DSI_ERRORS:-0},
   "touch_probe_failures": ${TOUCH_PROBE_FAIL:-0},
   "backlight_enable_failed": ${BL_ENABLE_FAIL:-0},
+  "driver_reasserted": ${DRV_REASSERT:-0},
+  "driver_reassert_at_s": ${DRV_REASSERT_T:-null},
+  "service_reasserted": ${SVC_REASSERT:-0},
   "touch_bound_at_s": ${TOUCH_PROBE_T:-null},
   "first_cci_timeout_s": ${FIRST_CCI_T:-null},
   "last_cci_timeout_s": ${LAST_CCI_T:-null},

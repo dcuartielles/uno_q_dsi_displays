@@ -1,0 +1,32 @@
+01:07:56  [1/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:07:56  [1/8] waiting for a NEW boot (previous boot_id 7bf6dba1)
+01:09:15  [1/8] board up after 78s; measuring (LEDs off)
+01:09:26  [1/8] recovery settled after 8s; capturing the panel
+01:09:47  [2/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:09:47  [2/8] waiting for a NEW boot (previous boot_id e4617990)
+01:11:46  [2/8] board up after 118s; measuring (LEDs off)
+01:11:57  [2/8] recovery settled after 9s; capturing the panel
+01:12:19  [3/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:12:19  [3/8] waiting for a NEW boot (previous boot_id eec87b87)
+01:13:27  [3/8] board up after 68s; measuring (LEDs off)
+01:13:31  [3/8] recovery settled after 1s; capturing the panel
+01:13:53  [4/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:13:53  [4/8] waiting for a NEW boot (previous boot_id 9c2eafaa)
+01:15:25  [4/8] board up after 92s; measuring (LEDs off)
+01:15:42  [4/8] recovery settled after 14s; capturing the panel
+01:16:04  [5/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:16:04  [5/8] waiting for a NEW boot (previous boot_id 8089a94d)
+01:17:09  [5/8] board up after 66s; measuring (LEDs off)
+01:17:20  [5/8] recovery settled after 8s; capturing the panel
+01:17:41  [6/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:17:41  [6/8] waiting for a NEW boot (previous boot_id 81549f62)
+01:18:54  [6/8] board up after 73s; measuring (LEDs off)
+01:19:06  [6/8] recovery settled after 9s; capturing the panel
+01:19:28  [7/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:19:28  [7/8] waiting for a NEW boot (previous boot_id 34a77607)
+01:20:46  [7/8] board up after 78s; measuring (LEDs off)
+01:20:57  [7/8] recovery settled after 8s; capturing the panel
+01:21:18  [8/8] SIGNAL GREEN - unplug the board now, then plug it back in
+01:21:18  [8/8] waiting for a NEW boot (previous boot_id 78f16612)
+01:22:38  [8/8] board up after 80s; measuring (LEDs off)
+01:22:49  [8/8] recovery settled after 8s; capturing the panel

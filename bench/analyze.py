@@ -118,6 +118,7 @@ def report(dirs):
         "fail_inconsistent": "camera and software disagreed",
         "optical_error": "the camera check itself failed",
         "aborted": "the run was stopped waiting for a power cycle",
+        "collect_failed": "booted, but its status could not be collected",
     }
     for k in sorted(kinds, key=lambda k: -len(kinds[k])):
         v = kinds[k]

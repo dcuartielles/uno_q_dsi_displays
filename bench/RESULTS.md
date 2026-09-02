@@ -181,6 +181,55 @@ health.
 Touch improved independently: it now binds at **12 s on the first probe**,
 instead of failing and being reloaded at 99 s.
 
+### The in-driver fix
+
+The recovery service was a workaround. `attiny_update_status()` now arms a
+delayed work when its write is lost and re-asserts `REG_PWM` until it sticks,
+so the repair happens in the driver instead of a userspace service a minute
+later.
+
+8 cold boots, with the service still installed but only needed for touch:
+
+```
+iter  verdict          attiny  bl_fail  drv_fix  drv@      panel
+1     pass             2       1        1        21.8s     lit
+2     pass             9       1        1        28.2s     lit
+3     pass             2       0        0        -         lit
+4     pass             3       1        1        29.1s     lit
+5     pass             5       1        1        21.9s     lit
+6     fail_dark_panel  5       1        1        29.2s     DARK
+7     pass             1       0        0        -         lit
+8     pass             3       0        1        11.8s     lit
+
+lit at boot, nothing needed : 3
+repaired by the DRIVER      : 4
+repaired by userspace only  : 0
+FAILED                      : 1
+```
+
+**Every repair was done in-kernel** - the userspace service contributed nothing
+to the backlight on any of the 8 boots. The panel is wrongly dark for roughly
+four seconds (the pipeline enables at ~17 s, the driver re-asserts at ~21 s)
+rather than 63.
+
+### One failure that is NOT explained
+
+Iteration 6 is honest evidence against a clean story: the driver re-asserted
+`REG_PWM`, the write **succeeded**, brightness read 255 - and the panel stayed
+dark. So "writing PWM is enough to light the panel", which this fix is built
+on, is not universally true.
+
+Two hypotheses were tested on the bench and **both failed**:
+
+- *`PC_LED_EN` gates the backlight.* Clearing bit 0 of `PORTC` on a lit panel
+  did not darken it.
+- *The panel/bridge resets were never released.* Asserting them on a lit panel
+  did not darken it either.
+
+So the mechanism behind that one dark boot remains unknown, and this write-up
+deliberately does not invent one. It is roughly a 1-in-8 residual, and the
+userspace service is what still covers it.
+
 ### Still not solved
 
 `PORTC` writes still fail 50-90% of the time. We stopped amplifying that into a

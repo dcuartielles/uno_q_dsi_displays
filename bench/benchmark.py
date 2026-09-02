@@ -384,13 +384,20 @@ class Power:
 
 
 # ------------------------------------------------------------ iterations ---
-def score(sw, opt):
+def score(sw, opt, ssh_ok=False):
     """Combine software state and optical truth into a verdict.
 
     Both have to agree. Software alone cannot see a dark panel; the camera
     alone cannot tell you the touchscreen bound.
     """
     if sw is None:
+        # Distinguish "never booted" from "booted, but the collector failed".
+        # Reporting both as no_boot once claimed the board never came back on
+        # an iteration where it had booted fine and the panel was lit - the
+        # collector was simply emitting malformed JSON.
+        if ssh_ok:
+            return "collect_failed", ("the board booted but its status could "
+                                      "not be collected")
         return "no_boot", "the board never came back on the network"
     if opt.get("error"):
         return "optical_error", opt["error"]
@@ -473,7 +480,7 @@ def run_iteration(i, total, args, power, outdir):
     rec["software"] = sw
     rec["optical"] = opt
     rec["total_s"] = round(time.time() - t0, 1)
-    rec["verdict"], rec["note"] = score(sw, opt)
+    rec["verdict"], rec["note"] = score(sw, opt, ssh_ok=waited is not None)
 
     # Only keep frames from failures - 100 passing screenshots is just clutter.
     if rec["verdict"] == "pass" and os.path.exists(shot) and not args.keep_frames:
