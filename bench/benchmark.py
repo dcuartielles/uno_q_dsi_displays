@@ -94,11 +94,53 @@ def log(msg):
             pass
 
 
+def _kill_tree(pid):
+    """Kill a process and everything it spawned."""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        try:
+            os.killpg(os.getpgid(pid), 9)
+        except OSError:
+            pass
+
+
 def remote(cmd, timeout=120):
-    """Run a command on the board. Returns (rc, stdout, stderr)."""
-    r = subprocess.run([SH, os.path.join(HERE, "remote.sh"), cmd],
-                       capture_output=True, text=True, timeout=timeout)
-    return r.returncode, r.stdout, r.stderr
+    """Run a command on the board. Returns (rc, stdout, stderr).
+
+    Deliberately writes output to temporary FILES rather than pipes, and kills
+    the whole process tree on timeout.
+
+    subprocess.run(capture_output=True, timeout=...) is unsafe here and cost
+    three separate stalled benchmark runs before I understood why. On timeout
+    it kills the direct child - sh - but the grandchild ssh survives holding
+    the stdout pipe, and communicate() then blocks forever waiting for an EOF
+    that can never arrive. The symptom is maddening: the process is alive, has
+    no children (sh is dead, the orphaned ssh has been reparented) and makes no
+    progress at all.
+
+    Files cannot block on EOF, and killing the tree takes the orphaned ssh with
+    it, so neither half of that failure can happen again.
+    """
+    import tempfile
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        p = subprocess.Popen([SH, os.path.join(HERE, "remote.sh"), cmd],
+                             stdout=out, stderr=err, stdin=subprocess.DEVNULL)
+        try:
+            rc = p.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            _kill_tree(p.pid)
+            try:
+                p.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+            rc = -1
+        out.seek(0)
+        err.seek(0)
+        return (rc,
+                out.read().decode("utf-8", "replace"),
+                err.read().decode("utf-8", "replace"))
 
 
 def board_is_up(timeout=20):
