@@ -34,7 +34,9 @@ Usage: patch-edt-ft5x06.py <edt-ft5x06.c>
 """
 import sys
 
-IDENTIFY_RETRY_MS = 10000
+# Kept modest: each retry is cheap now that it does not touch the reset line,
+# but there is no point waiting minutes.
+IDENTIFY_RETRY_MS = 6000
 
 POLL_FNS = """static void edt_ft5x06_ts_irq_poll_timer(struct timer_list *t)
 {
@@ -226,14 +228,20 @@ def main():
 					tries, error);
 				return error;
 			}
-			if (tsdata->reset_gpio) {
-				gpiod_set_value_cansleep(tsdata->reset_gpio, 1);
-				usleep_range(5000, 6000);
-				gpiod_set_value_cansleep(tsdata->reset_gpio, 0);
-				msleep(300);
-			} else {
-				msleep(200);
-			}
+			/*
+			 * Deliberately NOT pulsing reset here. On this board
+			 * the reset line is a GPIO on the panel controller,
+			 * driven over the same I2C bus - so each pulse is two
+			 * writes to REG_PORTC, and PORTC writes fail 50-90% of
+			 * the time and wedge the whole CCI bus after only a
+			 * handful. Pulsing on every retry produced ~60 PORTC
+			 * writes and reliably took the bus down, which then
+			 * broke the backlight and the touch probe alike.
+			 *
+			 * The reset already got one pulse before this loop.
+			 * Just wait and ask again.
+			 */
+			msleep(250);
 		}
 		if (tries)
 			dev_info(&client->dev,

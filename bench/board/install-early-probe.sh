@@ -38,8 +38,11 @@ cat > "$UNIT" <<EOF
 [Unit]
 Description=Probe the CCI I2C bus during early boot (uno-q-dsi-panel diagnostic)
 DefaultDependencies=no
-After=sysinit.target
-Before=basic.target
+# sysinit.target completes late - ordering after it started the probe at 39s
+# and missed the whole window, which opens at about 8s. Order against the
+# filesystem instead, which is all this needs.
+After=systemd-remount-fs.service
+Before=sysinit.target
 
 [Service]
 Type=simple

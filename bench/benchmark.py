@@ -246,7 +246,10 @@ def wait_for_recovery(cap=180.0, poll=5.0):
             "systemctl show -p ActiveState --value uno-q-dsi-panel-recover "
             "2>/dev/null || echo missing", timeout=20)
         state = (out or "").strip().splitlines()[-1] if out.strip() else "missing"
-        if state in ("active", "failed", "missing"):
+        # "inactive" matters: when testing the driver fix the recovery service
+        # is deliberately disabled, and without this every iteration would sit
+        # here for the full cap waiting for a unit that will never run.
+        if state in ("active", "failed", "missing", "inactive"):
             return time.time() - start
         time.sleep(poll)
     return None
@@ -585,7 +588,10 @@ def main():
                    help="max seconds to wait for the recovery service to "
                         "finish before judging (default 200)")
     p.add_argument("--post-settle", type=float, default=8.0,
-                   help="extra seconds after recovery finishes")
+                   help="extra seconds after recovery finishes. When testing a "
+                        "driver fix with no recovery service, keep this SHORT: "
+                        "the claim is that the panel lights at boot, so "
+                        "measuring late would flatter the result")
     p.add_argument("--prompt", action="store_true",
                    help="ask for Enter at each power cycle instead of "
                         "detecting it (needs an interactive terminal)")

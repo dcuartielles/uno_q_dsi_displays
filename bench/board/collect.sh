@@ -59,16 +59,19 @@ CCI_TIMEOUTS=$(dmesg 2>/dev/null | grep -c 'cci.*timeout')
 ATTINY_FAILS=$(dmesg 2>/dev/null | grep -c 'attiny:.*failed')
 DSI_ERRORS=$(dmesg 2>/dev/null | grep -c 'dsi_err')
 TOUCH_PROBE_FAIL=$(dmesg 2>/dev/null | grep -c 'edt_ft5x06.*probe failed')
+# The kernel says so explicitly when the backlight write fails, which is
+# the software-visible half of the dark-panel bug.
+BL_ENABLE_FAIL=$(dmesg 2>/dev/null | grep -c 'failed to enable backlight')
 
 # When the touch driver bound, and whether the recovery service had to step in.
 TOUCH_PROBE_T=$(dmesg 2>/dev/null | sed -n 's/^\[ *\([0-9.]*\)\].*edt_ft5x06.*no IRQ, polling.*/\1/p' | head -1)
 FIRST_CCI_T=$(dmesg 2>/dev/null | sed -n 's/^\[ *\([0-9.]*\)\].*cci.*timeout.*/\1/p' | head -1)
 LAST_CCI_T=$(dmesg 2>/dev/null | sed -n 's/^\[ *\([0-9.]*\)\].*cci.*timeout.*/\1/p' | tail -1)
 RECOVERED=0
-journalctl -u uno-q-dsi-panel-recover --no-pager -o cat 2>/dev/null \
+journalctl -u uno-q-dsi-panel-recover -b --no-pager -o cat 2>/dev/null \
     | grep -q 'touch recovered' && RECOVERED=1
 RECOVERY_RAN=0
-journalctl -u uno-q-dsi-panel-recover --no-pager -o cat 2>/dev/null \
+journalctl -u uno-q-dsi-panel-recover -b --no-pager -o cat 2>/dev/null \
     | grep -q 'reload attempt' && RECOVERY_RAN=1
 
 # --------------------------------------------------------------- verdict ---
@@ -98,6 +101,7 @@ cat <<EOF
   "attiny_write_failures": ${ATTINY_FAILS:-0},
   "dsi_errors": ${DSI_ERRORS:-0},
   "touch_probe_failures": ${TOUCH_PROBE_FAIL:-0},
+  "backlight_enable_failed": ${BL_ENABLE_FAIL:-0},
   "touch_bound_at_s": ${TOUCH_PROBE_T:-null},
   "first_cci_timeout_s": ${FIRST_CCI_T:-null},
   "last_cci_timeout_s": ${LAST_CCI_T:-null},

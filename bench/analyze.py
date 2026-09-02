@@ -20,6 +20,7 @@ METRICS = [
     ("cci_timeouts", "CCI I2C timeouts"),
     ("attiny_write_failures", "attiny write failures"),
     ("touch_probe_failures", "touch probe failures"),
+    ("backlight_enable_failed", "backlight enable failed"),
     ("dsi_errors", "DSI errors"),
     ("touch_bound_at_s", "touch bound at (s)"),
     ("last_cci_timeout_s", "last CCI timeout (s)"),
