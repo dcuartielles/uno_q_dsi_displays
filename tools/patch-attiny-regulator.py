@@ -46,6 +46,16 @@ PORTC_ATTEMPTS = 1
 OTHER_ATTEMPTS = 3
 OTHER_GAP_MS = 20
 
+# Deferred backlight re-assert. REG_PWM is the safe register - 0 failures in 32
+# measured writes, and it never wedges the bus - and writing it alone is enough
+# to light the panel. So when the backlight write is lost we simply keep trying
+# in the background until it sticks.
+#
+# The deadline is generous because on a bad boot the bus can be disturbed for
+# tens of seconds; the retry itself costs nothing.
+PWM_RETRY_MS = 2000
+PWM_DEADLINE_MS = 90000
+
 
 def main():
     if len(sys.argv) != 2:
@@ -110,9 +120,124 @@ def main():
          "\tdata = state->port_states[REG_PORTC - REG_PORTA];\n"
          "\treturn data & PC_RST_BRIDGE_N;" + s[m.end():])
 
-    if "#include <linux/jiffies.h>" not in s:
-        s = s.replace("#include <linux/module.h>",
-                      "#include <linux/jiffies.h>\n#include <linux/module.h>", 1)
+    # 3. deferred backlight re-assert, using the register that never fails
+    #
+    # When the backlight write is lost the panel is dark while rendering a
+    # perfectly good picture, and nothing in software can see it. Retrying
+    # REG_PORTC to fix that is what wedges the bus - but REG_PWM is safe
+    # (measured: 0 failures in 32 writes, never wedges), and writing it alone
+    # is enough to light the panel. So on failure we keep re-asserting PWM
+    # from a workqueue until it sticks.
+    #
+    # This is what removes the need for a userspace recovery service: the
+    # panel comes back in seconds rather than ~38s.
+    s = s.replace(
+        "\tstruct gpio_chip gc;\n};",
+        "\tstruct gpio_chip gc;\n\n"
+        "\t/* deferred backlight re-assert; see attiny_pwm_retry_work() */\n"
+        "\tstruct delayed_work pwm_work;\n"
+        "\tstruct backlight_device *bl;\n"
+        "\tunsigned long pwm_deadline;\n};", 1)
+
+    work_fn = (
+        "static void attiny_pwm_retry_work(struct work_struct *work)\n"
+        "{\n"
+        "\tstruct attiny_lcd *state = container_of(to_delayed_work(work),\n"
+        "\t\t\t\t\t\tstruct attiny_lcd, pwm_work);\n"
+        "\tint brightness, ret;\n"
+        "\n"
+        "\tif (!state->bl)\n"
+        "\t\treturn;\n"
+        "\n"
+        "\t/*\n"
+        "\t * props.brightness, not backlight_get_brightness(): we want the\n"
+        "\t * brightness that was asked for, even if the device currently\n"
+        "\t * reads as blanked.\n"
+        "\t */\n"
+        "\tbrightness = state->bl->props.brightness;\n"
+        "\n"
+        "\tscoped_guard(mutex, &state->lock)\n"
+        "\t\tret = regmap_write(state->regmap, REG_PWM, brightness);\n"
+        "\n"
+        "\tif (!ret) {\n"
+        "\t\tpr_info(\"attiny: backlight re-asserted (brightness %d)\\n\",\n"
+        "\t\t\tbrightness);\n"
+        "\t\treturn;\n"
+        "\t}\n"
+        "\n"
+        "\tif (time_before(jiffies, state->pwm_deadline))\n"
+        "\t\tschedule_delayed_work(&state->pwm_work,\n"
+        "\t\t\t\t      msecs_to_jiffies(PWM_RETRY_MS));\n"
+        "\telse\n"
+        "\t\tpr_warn(\"attiny: backlight could not be re-asserted: %d\\n\",\n"
+        "\t\t\tret);\n"
+        "}\n"
+        "\n"
+        "static void attiny_cancel_pwm_work(void *data)\n"
+        "{\n"
+        "\tstruct attiny_lcd *state = data;\n"
+        "\n"
+        "\tcancel_delayed_work_sync(&state->pwm_work);\n"
+        "}\n"
+        "\n")
+    anchor = "static int attiny_update_status(struct backlight_device *bl)"
+    if anchor not in s:
+        sys.exit("attiny: update_status anchor not found")
+    s = s.replace(anchor, work_fn + anchor, 1)
+
+    # On failure, arm the retry instead of just returning the error.
+    old_us = ("\tfor (i = 0; i < 10; i++) {\n"
+              "\t\tret = regmap_write(regmap, REG_PWM, brightness);\n"
+              "\t\tif (!ret)\n"
+              "\t\t\tbreak;\n"
+              "\t}\n"
+              "\n"
+              "\treturn ret;")
+    if old_us not in s:
+        sys.exit("attiny: update_status body anchor not found")
+    s = s.replace(old_us,
+                  "\tfor (i = 0; i < 10; i++) {\n"
+                  "\t\tret = regmap_write(regmap, REG_PWM, brightness);\n"
+                  "\t\tif (!ret)\n"
+                  "\t\t\tbreak;\n"
+                  "\t}\n"
+                  "\n"
+                  "\t/*\n"
+                  "\t * A lost write here means a dark panel that every\n"
+                  "\t * software check still reports as healthy, so keep\n"
+                  "\t * trying in the background rather than giving up.\n"
+                  "\t */\n"
+                  "\tif (ret) {\n"
+                  f"\t\tstate->pwm_deadline = jiffies + msecs_to_jiffies({PWM_DEADLINE_MS});\n"
+                  "\t\tschedule_delayed_work(&state->pwm_work,\n"
+                  f"\t\t\t\t      msecs_to_jiffies({PWM_RETRY_MS}));\n"
+                  "\t}\n"
+                  "\n"
+                  "\treturn ret;", 1)
+
+    # Wire it up in probe, and make sure it cannot outlive the device.
+    old_probe = "\tbl->props.brightness = 0xff;\n"
+    if old_probe not in s:
+        sys.exit("attiny: probe backlight anchor not found")
+    s = s.replace(old_probe,
+                  "\tbl->props.brightness = 0xff;\n"
+                  "\n"
+                  "\tstate->bl = bl;\n"
+                  "\tINIT_DELAYED_WORK(&state->pwm_work, attiny_pwm_retry_work);\n"
+                  "\tret = devm_add_action_or_reset(&i2c->dev,\n"
+                  "\t\t\t\t       attiny_cancel_pwm_work, state);\n"
+                  "\tif (ret)\n"
+                  "\t\treturn ret;\n", 1)
+
+    s = s.replace("#define REG_ID\t\t0x80",
+                  f"#define PWM_RETRY_MS\t\t{PWM_RETRY_MS}\n"
+                  f"#define PWM_DEADLINE_MS\t\t{PWM_DEADLINE_MS}\n\n"
+                  "#define REG_ID\t\t0x80", 1)
+
+    for hdr in ("#include <linux/jiffies.h>", "#include <linux/workqueue.h>"):
+        if hdr not in s:
+            s = s.replace("#include <linux/module.h>",
+                          hdr + "\n#include <linux/module.h>", 1)
 
     open(p, "w").write(s)
     print("  attiny regulator: safe retries (no PORTC storm) + cached is_enabled")

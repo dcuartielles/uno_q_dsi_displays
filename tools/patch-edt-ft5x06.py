@@ -34,9 +34,19 @@ Usage: patch-edt-ft5x06.py <edt-ft5x06.c>
 """
 import sys
 
-# Kept modest: each retry is cheap now that it does not touch the reset line,
-# but there is no point waiting minutes.
-IDENTIFY_RETRY_MS = 6000
+# Deliberately SHORT, and this was measured the hard way.
+#
+# Reads are individually safe - they never wedge the bus - so a long retry
+# window looked free. It is not. Stretching it to 40s made things worse on both
+# counts: touch went from 1-in-4 missing to 3-in-6, and the panel controller's
+# backlight re-assert slipped from 11.7s to ~54s, because it could not get a
+# word in until the touch driver finally gave up. Safe in isolation is not the
+# same as harmless in aggregate when two drivers share one bus.
+#
+# So: try a few times for a transient hiccup, then stop and let the panel
+# controller have the bus. A boot that needs longer than this is recovered by
+# reloading the driver afterwards, which costs nothing while it is not running.
+IDENTIFY_RETRY_MS = 8000
 
 POLL_FNS = """static void edt_ft5x06_ts_irq_poll_timer(struct timer_list *t)
 {
