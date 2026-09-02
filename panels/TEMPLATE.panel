@@ -1,0 +1,75 @@
+# Panel definition template.
+#
+# Copy this to <your-panel>.panel and fill it in, then:
+#   sudo ./install.sh panels/<your-panel>.panel
+#
+# WHERE TO GET THE NUMBERS
+# ------------------------
+# Most Waveshare/Pi-compatible DSI panels are already described in Raspberry
+# Pi's kernel tree. Find the overlay for your panel here:
+#
+#   https://github.com/raspberrypi/linux/tree/rpi-6.12.y/arch/arm/boot/dts/overlays
+#
+# Look for vc4-kms-dsi-<something>-overlay.dts. Inside you will find either
+#
+#   (a) a "panel-dsi" node with a panel-timing block - copy the numbers
+#       straight across; or
+#   (b) a compatible like "waveshare,7.9inch-dsi", in which case the timings
+#       live in drivers/gpu/drm/panel/panel-simple.c (search for that string,
+#       then read the drm_display_mode it points at).
+#
+# Converting a drm_display_mode to the fields below:
+#   CLOCK_KHZ = .clock
+#   HFRONT    = .hsync_start - .hdisplay
+#   HSYNC     = .hsync_end   - .hsync_start
+#   HBACK     = .htotal      - .hsync_end
+#   VFRONT    = .vsync_start - .vdisplay
+#   VSYNC     = .vsync_end   - .vsync_start
+#   VBACK     = .vtotal      - .vsync_end
+#
+# See docs/ADDING-A-PANEL.md for a worked example.
+
+PANEL_ID="my-panel"
+
+# Any unique compatible string. If RPi already defines one for this panel,
+# reuse it - it makes the definition easier to cross-check.
+PANEL_COMPATIBLE="vendor,my-panel-dsi"
+
+# C identifier for the generated panel-simple descriptor (letters/digits/_).
+PANEL_C_NAME="my_panel"
+
+# --- display timings -------------------------------------------------------
+CLOCK_KHZ=27777        # pixel clock, kHz
+HACTIVE=800
+HFRONT=59
+HSYNC=2
+HBACK=45
+VACTIVE=480
+VFRONT=7
+VSYNC=2
+VBACK=22
+
+WIDTH_MM=0             # physical size in mm, 0 if unknown
+HEIGHT_MM=0
+
+# --- DSI link --------------------------------------------------------------
+DSI_LANES=1                                  # 1..4
+DSI_FORMAT="MIPI_DSI_FMT_RGB888"             # or RGB666 / RGB666_PACKED / RGB565
+DSI_MODE_FLAGS="MIPI_DSI_MODE_VIDEO"         # add | MIPI_DSI_MODE_VIDEO_BURST etc
+BPC=8                                        # bits per colour, 6 or 8
+
+# --- panel power / backlight controller on I2C -----------------------------
+# Leave as-is for panels using the Raspberry Pi style ATTINY controller at
+# 0x45. If your panel has no such controller, set PANEL_CTRL_ADDR="" and the
+# overlay will omit it (you will then need another power-supply/backlight).
+PANEL_CTRL_COMPATIBLE="raspberrypi,7inch-touchscreen-panel-regulator"
+PANEL_CTRL_ADDR="0x45"
+
+# --- touch (optional; leave TOUCH_ADDR empty to omit) ----------------------
+TOUCH_COMPATIBLE="edt,edt-ft5506"
+TOUCH_ADDR="0x38"
+TOUCH_SIZE_X=800
+TOUCH_SIZE_Y=480
+TOUCH_INVERT_X=0
+TOUCH_INVERT_Y=0
+TOUCH_RESET_GPIO=1

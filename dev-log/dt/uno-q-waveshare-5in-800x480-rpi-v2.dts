@@ -1,0 +1,163 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Arduino UNO Q + UNO Media Carrier + Waveshare 5inch DSI LCD (800x480)
+ * VERSION 2 - a faithful port of Raspberry Pi's own vc4-kms-dsi-7inch overlay.
+ *
+ * Waveshare's wiki tells you to use `dtoverlay=vc4-kms-dsi-7inch`, i.e. RPi's
+ * overlay and drivers. v1 of this file was written from the mainline bindings
+ * and got three things structurally wrong:
+ *
+ *  1. RESET ORDERING.  RPi does NOT put reset-gpios on the tc358762. Instead an
+ *     intermediate fixed regulator ("reg_bridge") has the ATTINY's gpio 0 as its
+ *     ENABLE gpio, and the bridge's vddc-supply points at that regulator. So the
+ *     bridge reset is released as part of regulator enable, *before* the bridge
+ *     driver's pre_enable runs. v1 released it inside pre_enable - and that was
+ *     exactly the I2C write that kept timing out.
+ *
+ *  2. TIMINGS.  v1 used the timings from panel-raspberrypi-touchscreen.c
+ *     (clock 25.9794 MHz, hfp 1, hbp 46, vbp 21). The tc358762 + panel-simple
+ *     path uses a completely different mode:
+ *         clock 30 MHz, hfp 131, hsync 2, hbp 45, vfp 7, vsync 2, vbp 22
+ *     A 130-pixel error in the front porch.
+ *
+ *  3. TOUCH.  compatible is "edt,edt-ft5506" (not ft5406), with vcc-supply and
+ *     a reset-gpio off the ATTINY's gpio 1. RPi's node has no interrupt either.
+ *
+ * Reference: raspberrypi/linux rpi-6.12.y
+ *   arch/arm/boot/dts/overlays/vc4-kms-dsi-7inch-overlay.dts
+ *   arch/arm/boot/dts/overlays/edt-ft5406.dtsi
+ *   drivers/gpu/drm/panel/panel-simple.c  (raspberrypi_7inch)
+ *
+ * Build:
+ *   dtc -@ -I dts -O dtb -o uno-q-waveshare-5in-800x480-rpi-v2.dtbo <this file>
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/* ---- I2C: the ATTINY panel controller, and the touch controller ---- */
+	fragment@0 {
+		target = <&cci_i2c0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg_display: regulator@45 {
+				compatible = "raspberrypi,7inch-touchscreen-panel-regulator";
+				reg = <0x45>;
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			/* RPi: edt-ft5406.dtsi. gpio 1 = RST_TP_N, active low. */
+			ft5406: touchscreen@38 {
+				compatible = "edt,edt-ft5506";
+				reg = <0x38>;
+				vcc-supply = <&reg_display>;
+				reset-gpio = <&reg_display 1 1>;
+				touchscreen-size-x = <800>;
+				touchscreen-size-y = <480>;
+				touchscreen-inverted-x;
+				touchscreen-inverted-y;
+			};
+		};
+	};
+
+	/* ---- the intermediate bridge regulator (THE key structural fix) ----
+	 * Enabling this drives ATTINY gpio 0 high, which releases RST_BRIDGE_N
+	 * (and RST_LCD_N). vin-supply chains it behind the ATTINY regulator so
+	 * the ordering is guaranteed.
+	 */
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			reg_bridge: reg-bridge {
+				compatible = "regulator-fixed";
+				regulator-name = "bridge_reg";
+				gpio = <&reg_display 0 0>;
+				vin-supply = <&reg_display>;
+				enable-active-high;
+			};
+
+			panel_disp: panel-dpi {
+				compatible = "panel-dpi";
+				backlight = <&reg_display>;
+				power-supply = <&reg_display>;
+				width-mm = <154>;
+				height-mm = <86>;
+
+				/* raspberrypi_7inch_mode from RPi's panel-simple.c */
+				panel-timing {
+					clock-frequency = <30000000>;
+					hactive = <800>;
+					hfront-porch = <131>;
+					hsync-len = <2>;
+					hback-porch = <45>;
+					vactive = <480>;
+					vfront-porch = <7>;
+					vsync-len = <2>;
+					vback-porch = <22>;
+					hsync-active = <0>;	/* NHSYNC */
+					vsync-active = <0>;	/* NVSYNC */
+					de-active = <1>;
+					pixelclk-active = <1>;
+				};
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&bridge_out>;
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- TC358762 DSI-to-DPI bridge ----
+	 * NOTE: no reset-gpios here, deliberately. vddc-supply = <&reg_bridge>
+	 * is what releases the reset, exactly as RPi does it.
+	 */
+	fragment@2 {
+		target = <&mdss_dsi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			vdda-supply = <&pm4125_l5>;
+			status = "okay";
+
+			bridge@0 {
+				reg = <0>;
+				compatible = "toshiba,tc358762";
+				vddc-supply = <&reg_bridge>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						bridge_in: endpoint {
+							remote-endpoint = <&mdss_dsi0_out>;
+						};
+					};
+
+					port@1 {
+						reg = <1>;
+						bridge_out: endpoint {
+							remote-endpoint = <&panel_in>;
+						};
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- DSI output: 1 lane (tc358762.c sets dsi->lanes = 1) ---- */
+	fragment@3 {
+		target = <&mdss_dsi0_out>;
+		__overlay__ {
+			remote-endpoint = <&bridge_in>;
+			data-lanes = <0>;
+		};
+	};
+};

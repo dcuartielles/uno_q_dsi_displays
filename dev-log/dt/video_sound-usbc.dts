@@ -1,0 +1,94 @@
+/dts-v1/;
+
+/ {
+
+	fragment@0 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+
+			ports {
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+
+				port@0 {
+					reg = <0x00>;
+
+					endpoint {
+						remote-endpoint = <0xffffffff>;
+						data-lanes = <0x00 0x01 0x02 0x03>;
+						phandle = <0x01>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			remote-endpoint = <0x01>;
+			data-lanes = <0x00 0x01 0x02 0x03>;
+		};
+	};
+
+	fragment@2 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+			#sound-dai-cells = <0x01>;
+
+			dai@18 {
+				reg = <0x12>;
+				qcom,sd-lines = <0x00>;
+			};
+		};
+	};
+
+	fragment@3 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			pinctrl-0 = <0xffffffff>;
+			pinctrl-names = "default";
+
+			hdmi-i2s-dai-link {
+				link-name = "HDMI/I2S Playback";
+
+				cpu {
+					sound-dai = <0xffffffff 0x12>;
+				};
+
+				platform {
+					sound-dai = <0xffffffff>;
+				};
+
+				codec {
+					sound-dai = <0xffffffff 0x00>;
+				};
+			};
+		};
+	};
+
+	__fixups__ {
+		anx7625 = "/fragment@0:target:0", "/fragment@3/__overlay__/hdmi-i2s-dai-link/codec:sound-dai:0";
+		mdss_dsi0_out = "/fragment@0/__overlay__/ports/port@0/endpoint:remote-endpoint:0", "/fragment@1:target:0";
+		q6afedai = "/fragment@2:target:0", "/fragment@3/__overlay__/hdmi-i2s-dai-link/cpu:sound-dai:0";
+		sound = "/fragment@3:target:0";
+		lpi_i2s2_active = "/fragment@3/__overlay__:pinctrl-0:0";
+		q6routing = "/fragment@3/__overlay__/hdmi-i2s-dai-link/platform:sound-dai:0";
+	};
+
+	__local_fixups__ {
+
+		fragment@1 {
+
+			__overlay__ {
+				remote-endpoint = <0x00>;
+			};
+		};
+	};
+};

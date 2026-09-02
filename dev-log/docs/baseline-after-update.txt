@@ -1,0 +1,88 @@
+UNO Q baseline — AFTER the update, 2026-09-01 ~19:00 UTC
+=========================================================
+(compare with baseline.txt, which is the pre-update launch-era state)
+
+RUNNING NOW
+  kernel     7.0.0-g122c2c22d838   (built Fri May  8 12:10:20 UTC 2026)
+  OS         Debian 13 trixie
+  network    wlan0 connected, <BOARD-IP>, clock NTP-synced
+  boot       systemd-boot entry ...-7.0.0-g122c2c22d838.conf (default, selected)
+             the old 6.16.7 entry is still present as a fallback
+  boot time  ~6 s from reboot command to adb back
+
+ARDUINO STACK (was -> now)
+  arduino-app-cli        0.6.6  -> 0.13.0
+  arduino-app-lab        0.2.0  -> 0.10.0
+  arduino-cli            1.3.1  -> 1.5.1
+  arduino-router         0.5.3  -> 0.10.0
+  arduino-unoq                  -> 0.2.0   (NEW - the meta-package)
+  arduino-unoq-config           -> 0.2.0   (NEW)
+  arduino-linux-config          -> 0.2.0   (NEW - the DT overlay CLI)
+  arduino-cloud-connector       -> 0.1.0   (NEW)
+  linux-image-7.0.0-g122c2c22d838           (NEW)
+
+*** THE OVERLAYS ARRIVED ***
+  /boot/efi/dtb/qcom/ now contains, all dated Sep 1 18:55:
+    qrb2210-arduino-imola-base.dtb
+    qrb2210-arduino-imola-carrier-media.dtbo
+    qrb2210-arduino-imola-carrier-media-camera-imx219-csi0-2lanes.dtbo
+    qrb2210-arduino-imola-carrier-media-camera-imx219-csi0-4lanes.dtbo
+    qrb2210-arduino-imola-carrier-media-camera-imx219-csi1-2lanes.dtbo
+    qrb2210-arduino-imola-carrier-media-camera-imx219-csi1-4lanes.dtbo
+    qrb2210-arduino-imola-carrier-media-full-2lanes.dtb
+    qrb2210-arduino-imola-carrier-media-full-4lanes.dtb
+    qrb2210-arduino-imola-carrier-media-panel-5in_touch_a-dsi.dtbo
+    qrb2210-arduino-imola-carrier-media-panel-8in_touch_a-dsi.dtbo
+    qrb2210-arduino-imola-carrier-media-panel-10in_touch_a-dsi.dtbo
+    qrb2210-arduino-imola-video_sound-usbc.dtbo
+
+*** OFFICIAL TOOLING — NO fdtoverlay HAND-WORK NEEDED ***
+  arduino-linux-config carrier {list|show|enable|disable}
+
+  $ arduino-linux-config carrier list
+    CARRIER          DEVICE     OPTIONS
+    media-carrier    camera0    none, type1-2lanes, type1-4lanes
+                     camera1    none, type1-2lanes, type1-4lanes
+                     display    none, 5-dsi-touch-a, 8-dsi-touch-a, 10-dsi-touch-a
+
+WHAT THE OFFICIAL 5-INCH OVERLAY ACTUALLY TARGETS
+  compatible = "waveshare,5.0-dsi-touch-a", "himax,hx8399c"
+  touch      = "goodix,gt9271"          @ 0x5d
+  gpio/bl    = "waveshare,dsi-touch-gpio" @ 0x45   (driver: gpio-waveshare-dsi.ko)
+  expander   = "nxp,pca9555"            @ 0x26
+  data-lanes = <0 1 2 3>                (4 lanes)
+  => this is the 5-DSI-TOUCH-A, 720x1280. NOT the 800x480 "5inch DSI LCD".
+
+  Driver IS present: panel-himax-hx8394.ko claims waveshare,5.0-dsi-touch-a
+  (and 5.5-dsi-touch-a). 8in/10in are panel-jadard-jd9365da-h3.ko.
+  modules.alias lists drivers for: waveshare 5.0/5.5/8.0/9.0/10.1 -dsi-touch-a/b.
+
+DRIVER SITUATION FOR THE 800x480 PANEL (TC358762 path)
+  tc358762   : ABSENT. Not a module, not builtin, no alias. Only tc358767 and
+               tc358768 ship as bridge modules.
+  panel-simple.ko : present
+  linux-headers-7.0.0-g122c2c22d838 : AVAILABLE in apt-repo.arduino.cc (not
+               installed) => an out-of-tree build of tc358762 is feasible.
+
+*** IMPORTANT CORRECTION TO THE ROLLBACK PLAN ***
+  EFI variables are READ-ONLY on this platform:
+    bootctl set-default -> "Failed to update EFI variable ...: Read-only file system"
+    bootctl set-oneshot -> same
+  So the `bootctl set-oneshot` safety net from README Phase 0 DOES NOT WORK here.
+  Rollback must instead be done by editing files on the writable ESP:
+    /boot/efi/loader/loader.conf        (a `default` directive)
+    /boot/efi/loader/entries/*.conf     (rename/remove to change what is picked)
+  Firmware otherwise boots the newest-versioned entry.
+
+CURRENT DISPLAY PIPELINE (default config, no carrier enabled)
+  /dev/dri/card0, connector card0-DP-1  => DSI is currently routed to the
+  ANX7625 bridge for DisplayPort-over-USB-C, as expected.
+  dmesg: msm_dpu 5e01000.display-controller bound 5e94000.dsi, drm/msm 1.13.0,
+  "Fixed dependency cycle(s)" messages between dsi@5e94000 and encoder@58 are
+  normal for this bridge topology.
+
+STILL TO DO
+  - confirm which physical 5-inch panel we have (see README section 2)
+  - if 5-DSI-TOUCH-A: `arduino-linux-config carrier enable` and we are done
+  - if 800x480 5inch DSI LCD: install headers, build tc358762, write an overlay
+    modelled on qrb2210-arduino-imola-carrier-media-panel-*-dsi.dtbo

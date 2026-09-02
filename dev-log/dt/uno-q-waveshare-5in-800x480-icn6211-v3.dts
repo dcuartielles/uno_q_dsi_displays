@@ -1,0 +1,148 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Arduino UNO Q + UNO Media Carrier + Waveshare 5inch DSI LCD (800x480)
+ * VERSION 3 - for the CHIPONE ICN6211 bridge.
+ *
+ * v1 and v2 both declared a Toshiba TC358762. The panel actually carries a
+ * Chipone ICN6211 DSI-to-RGB bridge (confirmed from the silkscreen). That is a
+ * completely different device: different init, different registers, different
+ * DSI link configuration. Configuring a TC358762 that is not on the board
+ * explains a fully working DSI link, a powered panel, a lit backlight and no
+ * image, with no error reported anywhere - the SoC believed it had succeeded.
+ *
+ * Differences that matter, from chipone-icn6211.c:
+ *
+ *   dsi->lanes      = read from the DT endpoint's data-lanes (defaults to 4).
+ *                     The TC358762 driver hardcoded 1. This panel wires two
+ *                     lanes on its FPC (DSI1_D0 and DSI1_D1), so use <0 1>.
+ *   dsi->format     = MIPI_DSI_FMT_RGB888
+ *   dsi->mode_flags = VIDEO | VIDEO_BURST | LPM | NO_EOT_PACKET
+ *                     (the TC358762 used VIDEO | SYNC_PULSE | LPM | HSE)
+ *
+ * The binding REQUIRES enable-gpios ("chip is reset when EN is low"), unlike
+ * the TC358762 where reset-gpios was optional. vdd1/vdd2/vdd3 are optional.
+ *
+ * Reference: Documentation/devicetree/bindings/display/bridge/chipone,icn6211.yaml
+ *
+ * Build:
+ *   dtc -@ -I dts -O dtb -o uno-q-waveshare-5in-800x480-icn6211-v3.dtbo <this file>
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/* ---- I2C: panel controller and touch, on the carrier's CCI bus ---- */
+	fragment@0 {
+		target = <&cci_i2c0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg_display: regulator@45 {
+				compatible = "raspberrypi,7inch-touchscreen-panel-regulator";
+				reg = <0x45>;
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			ft5406: touchscreen@38 {
+				compatible = "edt,edt-ft5506";
+				reg = <0x38>;
+				vcc-supply = <&reg_display>;
+				reset-gpio = <&reg_display 1 1>;
+				touchscreen-size-x = <800>;
+				touchscreen-size-y = <480>;
+				touchscreen-inverted-x;
+				touchscreen-inverted-y;
+			};
+		};
+	};
+
+	/* ---- the 800x480 RGB panel on the bridge's DPI output ---- */
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			panel_disp: panel-dpi {
+				compatible = "panel-dpi";
+				power-supply = <&reg_display>;
+				backlight = <&reg_display>;
+				width-mm = <109>;
+				height-mm = <65>;
+
+				panel-timing {
+					clock-frequency = <30000000>;
+					hactive = <800>;
+					hfront-porch = <131>;
+					hsync-len = <2>;
+					hback-porch = <45>;
+					vactive = <480>;
+					vfront-porch = <7>;
+					vsync-len = <2>;
+					vback-porch = <22>;
+					hsync-active = <0>;
+					vsync-active = <0>;
+					de-active = <1>;
+					pixelclk-active = <1>;
+				};
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&bridge_out>;
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- the ICN6211 bridge on the DSI host ---- */
+	fragment@2 {
+		target = <&mdss_dsi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			vdda-supply = <&pm4125_l5>;
+			status = "okay";
+
+			bridge@0 {
+				compatible = "chipone,icn6211";
+				reg = <0>;
+				/* REQUIRED by the binding: EN low holds the chip in reset.
+				 * gpio 0 of the panel controller is the line that was wired
+				 * as the bridge reset in the RPi-style design.
+				 */
+				enable-gpios = <&reg_display 0 0>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						bridge_in: endpoint {
+							remote-endpoint = <&mdss_dsi0_out>;
+							/* the driver reads the lane count from HERE */
+							data-lanes = <1 2>;
+						};
+					};
+
+					port@1 {
+						reg = <1>;
+						bridge_out: endpoint {
+							remote-endpoint = <&panel_in>;
+						};
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- DSI host output: two lanes ---- */
+	fragment@3 {
+		target = <&mdss_dsi0_out>;
+		__overlay__ {
+			remote-endpoint = <&bridge_in>;
+			data-lanes = <0 1>;
+		};
+	};
+};

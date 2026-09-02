@@ -1,0 +1,218 @@
+/dts-v1/;
+
+/ {
+
+	fragment@0 {
+		target-path = "/";
+
+		__overlay__ {
+
+			cam-pwr-csi0 {
+				compatible = "regulator-fixed";
+				regulator-name = "cam-pwr";
+				startup-delay-us = <0x186a0>;
+				gpio = <0x01 0x01 0x00>;
+				enable-active-high;
+			};
+
+			cam-pwr-csi1 {
+				compatible = "regulator-fixed";
+				regulator-name = "cam-pwr";
+				startup-delay-us = <0x186a0>;
+				gpio = <0x01 0x03 0x00>;
+				enable-active-high;
+			};
+
+			clocks {
+
+				cam-clk {
+					compatible = "fixed-clock";
+					#clock-cells = <0x00>;
+					clock-frequency = <0x16e3600>;
+					clock-output-names = "cam24m";
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			clock-frequency = <0x186a0>;
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+
+			gpio@26 {
+				compatible = "nxp,pca9555";
+				reg = <0x26>;
+				gpio-controller;
+				#gpio-cells = <0x02>;
+				phandle = <0x01>;
+			};
+		};
+	};
+
+	fragment@2 {
+		target-path = "/";
+
+		__overlay__ {
+
+			regulator-panel-avdd {
+				compatible = "regulator-fixed";
+				regulator-name = "panel-avdd";
+				gpios = <0x02 0x00 0x00>;
+				enable-active-high;
+				phandle = <0x04>;
+			};
+
+			regulator-panel-iovcc {
+				compatible = "regulator-fixed";
+				regulator-name = "panel-iovcc";
+				gpios = <0x02 0x04 0x00>;
+				enable-active-high;
+				phandle = <0x03>;
+			};
+
+			regulator-panel-vcc {
+				compatible = "regulator-fixed";
+				regulator-name = "panel-vcc";
+				gpios = <0x02 0x08 0x00>;
+				enable-active-high;
+				regulator-always-on;
+			};
+		};
+	};
+
+	fragment@3 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+
+			gpio@45 {
+				compatible = "waveshare,dsi-touch-gpio";
+				reg = <0x45>;
+				gpio-controller;
+				#gpio-cells = <0x02>;
+				phandle = <0x02>;
+			};
+
+			goodix@5d {
+				compatible = "goodix,gt9271";
+				reg = <0x5d>;
+				reset-gpio = <0x02 0x09 0x00>;
+			};
+		};
+	};
+
+	fragment@4 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			vdda-supply = <0xffffffff>;
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+			status = "okay";
+
+			dsi_panel@0 {
+				reg = <0x00>;
+				compatible = "waveshare,5.0-dsi-touch-a", "himax,hx8399c";
+				reset-gpio = <0x02 0x01 0x01>;
+				iovcc-supply = <0x03>;
+				vcc-supply = <0x04>;
+				backlight = <0x02>;
+
+				port {
+
+					endpoint {
+						remote-endpoint = <0xffffffff>;
+						phandle = <0x05>;
+					};
+				};
+			};
+		};
+	};
+
+	fragment@5 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			remote-endpoint = <0x05>;
+			data-lanes = <0x00 0x01 0x02 0x03>;
+		};
+	};
+
+	__fixups__ {
+		cci_i2c0 = "/fragment@1:target:0", "/fragment@3:target:0";
+		mdss_dsi0 = "/fragment@4:target:0";
+		pm4125_l5 = "/fragment@4/__overlay__:vdda-supply:0";
+		mdss_dsi0_out = "/fragment@4/__overlay__/dsi_panel@0/port/endpoint:remote-endpoint:0", "/fragment@5:target:0";
+	};
+
+	__local_fixups__ {
+
+		fragment@0 {
+
+			__overlay__ {
+
+				cam-pwr-csi0 {
+					gpio = <0x00>;
+				};
+
+				cam-pwr-csi1 {
+					gpio = <0x00>;
+				};
+			};
+		};
+
+		fragment@2 {
+
+			__overlay__ {
+
+				regulator-panel-avdd {
+					gpios = <0x00>;
+				};
+
+				regulator-panel-iovcc {
+					gpios = <0x00>;
+				};
+
+				regulator-panel-vcc {
+					gpios = <0x00>;
+				};
+			};
+		};
+
+		fragment@3 {
+
+			__overlay__ {
+
+				goodix@5d {
+					reset-gpio = <0x00>;
+				};
+			};
+		};
+
+		fragment@4 {
+
+			__overlay__ {
+
+				dsi_panel@0 {
+					reset-gpio = <0x00>;
+					iovcc-supply = <0x00>;
+					vcc-supply = <0x00>;
+					backlight = <0x00>;
+				};
+			};
+		};
+
+		fragment@5 {
+
+			__overlay__ {
+				remote-endpoint = <0x00>;
+			};
+		};
+	};
+};

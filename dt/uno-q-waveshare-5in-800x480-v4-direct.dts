@@ -1,0 +1,110 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Arduino UNO Q + UNO Media Carrier + Waveshare 800x480 DSI LCD
+ * VERSION 4 - DIRECT DSI PANEL, NO BRIDGE NODE.
+ *
+ * Ported from Raspberry Pi's
+ *   arch/arm/boot/dts/overlays/vc4-kms-dsi-waveshare-800x480-overlay.dts
+ *
+ * v1/v2 declared a toshiba,tc358762 bridge - wrong chip entirely.
+ * v3 declared a chipone,icn6211 bridge - right chip, wrong shape: RPi does not
+ * drive it as a bridge at all. The on-panel ICN6211 self-configures from its
+ * own strapping, so the host simply attaches the panel as a DSI device and
+ * feeds it video. Every bridge node written before this was unnecessary.
+ *
+ * Timings are RPi's, and differ sharply from the Pi 7" values used in v1-v3:
+ *   clock 27.777 MHz (not 30)   hfp 59 (not 131)   hbp 45   vfp 7  vsync 2  vbp 22
+ *   RGB888, MODE_VIDEO, ONE data lane
+ *
+ * These live in the patched panel-simple as "waveshare,4-3-inch-dsi" (RPi's
+ * compatible for this panel), since mainline lacks RPi's generic "panel-dsi"
+ * DT binding.
+ *
+ * Build:
+ *   dtc -@ -I dts -O dtb -o uno-q-waveshare-5in-800x480-v4-direct.dtbo <this file>
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/* ---- panel controller + touch on the carrier's CCI I2C ---- */
+	fragment@0 {
+		target = <&cci_i2c0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg_display: regulator@45 {
+				compatible = "raspberrypi,7inch-touchscreen-panel-regulator";
+				reg = <0x45>;
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			ft5406: touchscreen@38 {
+				compatible = "edt,edt-ft5506";
+				reg = <0x38>;
+				vcc-supply = <&reg_display>;
+				reset-gpio = <&reg_display 1 1>;
+				touchscreen-size-x = <800>;
+				touchscreen-size-y = <480>;
+				touchscreen-inverted-x;
+				touchscreen-inverted-y;
+			};
+		};
+	};
+
+	/*
+	 * ---- bridge_reg ----
+	 * RPi keeps this fixed regulator, gated by gpio 0 of the panel
+	 * controller (the line that releases the on-panel bridge), chained
+	 * behind reg_display. Kept for parity with their overlay.
+	 */
+	fragment@1 {
+		target-path = "/";
+		__overlay__ {
+			reg_bridge: reg-bridge {
+				compatible = "regulator-fixed";
+				regulator-name = "bridge_reg";
+				gpio = <&reg_display 0 0>;
+				vin-supply = <&reg_display>;
+				enable-active-high;
+				regulator-always-on;
+			};
+		};
+	};
+
+	/* ---- the panel, attached DIRECTLY to the DSI host ---- */
+	fragment@2 {
+		target = <&mdss_dsi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			vdda-supply = <&pm4125_l5>;
+			status = "okay";
+
+			panel: panel@0 {
+				compatible = "waveshare,4-3-inch-dsi";
+				reg = <0>;
+				power-supply = <&reg_display>;
+				backlight = <&reg_display>;
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&mdss_dsi0_out>;
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- DSI host output -> the panel, one lane ---- */
+	fragment@3 {
+		target = <&mdss_dsi0_out>;
+		__overlay__ {
+			remote-endpoint = <&panel_in>;
+			data-lanes = <0>;
+		};
+	};
+};

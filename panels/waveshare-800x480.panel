@@ -1,0 +1,54 @@
+# Waveshare 800x480 DSI LCD  (4.3" and 5" variants, ICN6211 bridge on-panel)
+#
+# Values taken verbatim from Raspberry Pi's
+#   arch/arm/boot/dts/overlays/vc4-kms-dsi-waveshare-800x480-overlay.dts
+# and drivers/gpu/drm/panel/panel-simple.c
+#
+# Verified working on: Arduino UNO Q + UNO Media Carrier, kernel 7.0.0
+# Panel tested: Waveshare "5inch DSI LCD", 15-pin FPC via a 15->22 pin adapter.
+
+PANEL_ID="waveshare-800x480"
+
+# Compatible string. Reusing RPi's keeps the definition recognisable; it is
+# matched by the descriptor we add to panel-simple, so it only has to be unique.
+PANEL_COMPATIBLE="waveshare,4-3-inch-dsi"
+
+# C identifier used for the generated panel-simple descriptor.
+PANEL_C_NAME="waveshare_800x480"
+
+# --- display timings -------------------------------------------------------
+# Pixel clock in kHz, porches in pixels/lines.
+CLOCK_KHZ=27777
+HACTIVE=800
+HFRONT=59
+HSYNC=2
+HBACK=45
+VACTIVE=480
+VFRONT=7
+VSYNC=2
+VBACK=22
+
+# Physical size in mm (0 = unknown). 5" 800x480 is about 109 x 65.
+WIDTH_MM=109
+HEIGHT_MM=65
+
+# --- DSI link --------------------------------------------------------------
+DSI_LANES=1
+DSI_FORMAT="MIPI_DSI_FMT_RGB888"
+DSI_MODE_FLAGS="MIPI_DSI_MODE_VIDEO"
+BPC=8
+
+# --- panel power / backlight controller on I2C -----------------------------
+# The ATTINY-style controller that powers the panel and drives the backlight.
+PANEL_CTRL_COMPATIBLE="raspberrypi,7inch-touchscreen-panel-regulator"
+PANEL_CTRL_ADDR="0x45"
+
+# --- touch (optional; leave TOUCH_ADDR empty to omit) ----------------------
+TOUCH_COMPATIBLE="edt,edt-ft5506"
+TOUCH_ADDR="0x38"
+TOUCH_SIZE_X=800
+TOUCH_SIZE_Y=480
+TOUCH_INVERT_X=1
+TOUCH_INVERT_Y=1
+# gpio line on the panel controller that releases the touch reset (active low)
+TOUCH_RESET_GPIO=1

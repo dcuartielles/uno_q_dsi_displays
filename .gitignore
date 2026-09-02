@@ -1,0 +1,22 @@
+# local build artefacts
+*.ko
+*.o
+*.mod
+*.mod.c
+*.order
+*.symvers
+.tmp_versions/
+Makefile.module
+
+# generated on the board
+*.dtbo
+*.dtb
+*.pristine
+build.log
+
+# never commit credentials or host-specific config
+*secrets*
+*.pem
+*.key
+id_*
+known_hosts

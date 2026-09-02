@@ -1,0 +1,4 @@
+# These scripts run on the board's Linux. Keep LF everywhere, always -
+# a CRLF shebang line makes the kernel refuse to run the script.
+* text=auto eol=lf
+*.ps1 text eol=crlf

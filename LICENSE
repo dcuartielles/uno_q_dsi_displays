@@ -1,0 +1,65 @@
+uno-q-dsi-panel is released under two licences, because it contains two kinds
+of work.
+
+================================================================================
+1. The repository itself - MIT
+================================================================================
+
+This covers the scripts, the panel definitions, the generator tools and the
+documentation: everything you can see in this repository.
+
+MIT License
+
+Copyright (c) 2026 David Cuartielles
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+================================================================================
+2. What the tools produce - GPL-2.0
+================================================================================
+
+This repository ships no kernel source. The scripts download the driver sources
+matching your running kernel from github.com/arduino/linux-qcom at build time,
+and the tools in tools/ modify them in place.
+
+Those sources are GPL-2.0, so the patched drivers you build and install are
+GPL-2.0 as well. Some of the changes the tools apply are adapted from the
+Raspberry Pi kernel tree (github.com/raspberrypi/linux), also GPL-2.0:
+
+  tools/patch-edt-ft5x06.py         polling fallback and released-contact
+                                    tracking, from RPi's edt-ft5x06 driver
+  tools/patch-attiny-regulator.py   cached is_enabled(), from RPi's
+                                    rpi-panel-attiny-regulator driver
+  tools/gen-panel-patch.py          the emitted panel descriptor follows the
+                                    panel-simple conventions in the Linux tree
+
+If you redistribute a built kernel module, or a modified copy of the driver
+sources these tools generate, you must do so under GPL-2.0 and provide the
+corresponding source. The generator scripts themselves stay MIT.
+
+Full text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+================================================================================
+3. Panel timings
+================================================================================
+
+The timings in panels/waveshare-800x480.panel are taken from the device tree
+overlay vc4-kms-dsi-waveshare-800x480-overlay.dts in the Raspberry Pi kernel
+tree (GPL-2.0/MIT dual-licensed, as are the arch/arm/boot/dts overlays there).
+They describe how the hardware behaves and are reproduced here as fact.

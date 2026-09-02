@@ -1,0 +1,162 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Arduino UNO Q + UNO Media Carrier + Waveshare 5inch DSI LCD (800x480)
+ *
+ * This panel is a Raspberry Pi 7"-official-display clone:
+ *   ATTINY88 @ 0x45  - panel power rail + backlight (I2C)
+ *   FT5406   @ 0x38  - FocalTech capacitive touch (I2C)
+ *   TC358762         - MIPI DSI -> MIPI DPI bridge (DSI virtual channel 0)
+ *
+ * Confirmed by I2C scan of the carrier bus: 0x45 and 0x38 present, 0x5d absent
+ * (0x5d would indicate the GT9271 of the 5-DSI-TOUCH-A, a different panel).
+ *
+ * Requires two out-of-tree modules built from the matching kernel commit:
+ *   tc358762.ko                  (drivers/gpu/drm/bridge/tc358762.c)
+ *   rpi-panel-attiny-regulator.ko (drivers/regulator/rpi-panel-attiny-regulator.c)
+ *
+ * Node layout mirrors Arduino's own
+ * qrb2210-arduino-imola-carrier-media-panel-5in_touch_a-dsi.dtbo, so it composes
+ * with qrb2210-arduino-imola-carrier-media.dtbo the same way. The PCA9555 GPIO
+ * expander and camera regulators are deliberately NOT redefined here - the
+ * carrier-media overlay already provides them.
+ *
+ * Build:
+ *   dtc -@ -I dts -O dtb -o uno-q-waveshare-5in-800x480-tc358762.dtbo <this file>
+ */
+
+/dts-v1/;
+/plugin/;
+
+/ {
+	/* ---- I2C devices on the carrier's DSI-side bus (Qualcomm CCI i2c-0) ---- */
+	fragment@0 {
+		target = <&cci_i2c0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			attiny: regulator@45 {
+				compatible = "raspberrypi,7inch-touchscreen-panel-regulator";
+				reg = <0x45>;
+				gpio-controller;
+				#gpio-cells = <2>;
+			};
+
+			touchscreen@38 {
+				compatible = "edt,edt-ft5406";
+				reg = <0x38>;
+				touchscreen-size-x = <800>;
+				touchscreen-size-y = <480>;
+			};
+		};
+	};
+
+	/* ---- TC358762 DSI-to-DPI bridge, hanging off the DSI host ---- */
+	fragment@1 {
+		target = <&mdss_dsi0>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			vdda-supply = <&pm4125_l5>;
+			status = "okay";
+
+			bridge@0 {
+				compatible = "toshiba,tc358762";
+				reg = <0>;
+				vddc-supply = <&attiny>;
+
+				/*
+				 * ESSENTIAL. Enabling the ATTINY regulator does NOT release
+				 * the bridge from reset - attiny_lcd_power_enable() ends with
+				 * PORTC = PC_LED_EN, leaving RST_BRIDGE_N low. Reset release
+				 * is a separate GPIO on the same chip:
+				 *   ATTINY gpio 0 = RST_BRIDGE_N (also drives RST_LCD_N)
+				 *   ATTINY gpio 1 = RST_TP_N
+				 * tc358762_pre_enable() does gpiod_set_value(reset, 1) to take
+				 * the bridge OUT of reset, so this is ACTIVE_HIGH (0).
+				 * Without this the whole pipeline comes up correctly - CRTC
+				 * active, correct mode, framebuffer scanning out - and the
+				 * panel stays black.
+				 */
+				reset-gpios = <&attiny 0 0>;
+
+				ports {
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					port@0 {
+						reg = <0>;
+						bridge_in: endpoint {
+							remote-endpoint = <&mdss_dsi0_out>;
+						};
+					};
+
+					port@1 {
+						reg = <1>;
+						bridge_out: endpoint {
+							remote-endpoint = <&panel_in>;
+						};
+					};
+				};
+			};
+		};
+	};
+
+	/* ---- the 800x480 DPI panel on the bridge's output ---- */
+	fragment@2 {
+		target-path = "/";
+		__overlay__ {
+			panel: panel-dpi {
+				compatible = "panel-dpi";
+				power-supply = <&attiny>;
+				backlight = <&attiny>;
+				width-mm = <109>;
+				height-mm = <65>;
+
+				/*
+				 * Timings from the mainline RPi touchscreen panel driver
+				 * (panel-raspberrypi-touchscreen.c). HFP=1 with 2 pixels of
+				 * HBP works around a hardware issue in this panel.
+				 */
+				panel-timing {
+					clock-frequency = <25979400>;
+					hactive = <800>;
+					hfront-porch = <1>;
+					hsync-len = <2>;
+					hback-porch = <46>;
+					vactive = <480>;
+					vfront-porch = <7>;
+					vsync-len = <2>;
+					vback-porch = <21>;
+					hsync-active = <0>;
+					vsync-active = <0>;
+					de-active = <1>;
+					pixelclk-active = <1>;
+				};
+
+				port {
+					panel_in: endpoint {
+						remote-endpoint = <&bridge_out>;
+					};
+				};
+			};
+		};
+	};
+
+	/*
+	 * ---- point the DSI output at the bridge ----
+	 * ONE lane. Not 4 (as Arduino's official panel overlays use) and not 2.
+	 * The TC358762 driver is unambiguous about this:
+	 *   tc358762.c:279  dsi->lanes = 1;
+	 *   tc358762_init() DSI_LANEENABLE = LANEENABLE_L0EN | LANEENABLE_CLEN
+	 * i.e. only data lane 0 plus the clock lane are ever enabled.
+	 * 800x480 at 25.98 MHz x 24bpp is ~623 Mbit/s, which one lane carries fine.
+	 */
+	fragment@3 {
+		target = <&mdss_dsi0_out>;
+		__overlay__ {
+			remote-endpoint = <&bridge_in>;
+			data-lanes = <0>;
+		};
+	};
+};

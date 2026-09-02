@@ -1,0 +1,268 @@
+/dts-v1/;
+
+/ {
+
+	fragment@0 {
+		target-path = "/";
+
+		__overlay__ {
+
+			cam-pwr-csi0 {
+				compatible = "regulator-fixed";
+				regulator-name = "cam-pwr";
+				startup-delay-us = <0x186a0>;
+				gpio = <0x01 0x01 0x00>;
+				enable-active-high;
+			};
+
+			cam-pwr-csi1 {
+				compatible = "regulator-fixed";
+				regulator-name = "cam-pwr";
+				startup-delay-us = <0x186a0>;
+				gpio = <0x01 0x03 0x00>;
+				enable-active-high;
+			};
+
+			clocks {
+
+				cam-clk {
+					compatible = "fixed-clock";
+					#clock-cells = <0x00>;
+					clock-frequency = <0x16e3600>;
+					clock-output-names = "cam24m";
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			clock-frequency = <0x186a0>;
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+
+			gpio@26 {
+				compatible = "nxp,pca9555";
+				reg = <0x26>;
+				gpio-controller;
+				#gpio-cells = <0x02>;
+				phandle = <0x01>;
+			};
+		};
+	};
+
+	fragment@2 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			status = "okay";
+			vdda-csiphy-1p2-supply = <0xffffffff>;
+			vdda-pll-1p8-supply = <0xffffffff>;
+		};
+	};
+
+	fragment@3 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@4 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+
+			led1-blue {
+				label = "media-carrier:blue1";
+				function = "indicator";
+				color = <0x03>;
+				gpios = <0x01 0x0e 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led1-green {
+				label = "media-carrier:green1";
+				function = "indicator";
+				color = <0x02>;
+				gpios = <0x01 0x0f 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led1-red {
+				label = "media-carrier:red1";
+				function = "indicator";
+				color = <0x01>;
+				gpios = <0x01 0x0d 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led2-blue {
+				label = "media-carrier:blue2";
+				function = "indicator";
+				color = <0x03>;
+				gpios = <0x01 0x0b 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led2-green {
+				label = "media-carrier:green2";
+				function = "indicator";
+				color = <0x02>;
+				gpios = <0x01 0x0c 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led2-red {
+				label = "media-carrier:red2";
+				function = "indicator";
+				color = <0x01>;
+				gpios = <0x01 0x0a 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led3-blue {
+				label = "media-carrier:blue3";
+				function = "indicator";
+				color = <0x03>;
+				gpios = <0x01 0x08 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led3-green {
+				label = "media-carrier:green3";
+				function = "indicator";
+				color = <0x02>;
+				gpios = <0x01 0x09 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led3-red {
+				label = "media-carrier:red3";
+				function = "indicator";
+				color = <0x01>;
+				gpios = <0x01 0x07 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led4-blue {
+				label = "media-carrier:blue4";
+				function = "indicator";
+				color = <0x03>;
+				gpios = <0x01 0x05 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led4-green {
+				label = "media-carrier:green4";
+				function = "indicator";
+				color = <0x02>;
+				gpios = <0x01 0x06 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+
+			led4-red {
+				label = "media-carrier:red4";
+				function = "indicator";
+				color = <0x01>;
+				gpios = <0x01 0x04 0x01>;
+				linux,default-trigger = "none";
+				default-state = "off";
+			};
+		};
+	};
+
+	__fixups__ {
+		cci_i2c0 = "/fragment@1:target:0";
+		camss = "/fragment@2:target:0";
+		pm4125_l5 = "/fragment@2/__overlay__:vdda-csiphy-1p2-supply:0";
+		pm4125_l13 = "/fragment@2/__overlay__:vdda-pll-1p8-supply:0";
+		cci = "/fragment@3:target:0";
+		leds = "/fragment@4:target:0";
+	};
+
+	__local_fixups__ {
+
+		fragment@0 {
+
+			__overlay__ {
+
+				cam-pwr-csi0 {
+					gpio = <0x00>;
+				};
+
+				cam-pwr-csi1 {
+					gpio = <0x00>;
+				};
+			};
+		};
+
+		fragment@4 {
+
+			__overlay__ {
+
+				led1-blue {
+					gpios = <0x00>;
+				};
+
+				led1-green {
+					gpios = <0x00>;
+				};
+
+				led1-red {
+					gpios = <0x00>;
+				};
+
+				led2-blue {
+					gpios = <0x00>;
+				};
+
+				led2-green {
+					gpios = <0x00>;
+				};
+
+				led2-red {
+					gpios = <0x00>;
+				};
+
+				led3-blue {
+					gpios = <0x00>;
+				};
+
+				led3-green {
+					gpios = <0x00>;
+				};
+
+				led3-red {
+					gpios = <0x00>;
+				};
+
+				led4-blue {
+					gpios = <0x00>;
+				};
+
+				led4-green {
+					gpios = <0x00>;
+				};
+
+				led4-red {
+					gpios = <0x00>;
+				};
+			};
+		};
+	};
+};
