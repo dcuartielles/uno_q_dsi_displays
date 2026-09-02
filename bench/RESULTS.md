@@ -22,8 +22,8 @@ software_ok : 1              <-- everything says fine
 camera      : state=dark, has_image=false
 ```
 
-The cause is narrow. On a cold boot the Qualcomm CCI I²C bus is dead for the
-first 30–90 seconds, and the panel controller's writes fail. Everything
+The cause is narrow. On a cold boot, writes to the panel controller at 0x45
+fail for roughly the first 30-40 seconds. Everything
 survives that **except the backlight PWM**. The DSI link, the panel resets and
 the rendered login screen were all correct on every single failed boot — the
 screen simply was not lit.
@@ -101,6 +101,32 @@ A real fix belongs in the driver's enable path — retrying `REG_PWM` until the
 controller answers, instead of giving up after a tight loop of ten attempts.
 That would light the panel at boot rather than a minute later. The recovery
 service is the pragmatic fix, not the right one.
+
+---
+
+## Correction: "the CCI bus is dead" is probably wrong
+
+Most of this work described the failure as the CCI I2C bus dying for the first
+30-90 seconds. The boot timeline does not support that:
+
+```
+[ 4.07s] pca953x 0-0026: bound OK            <-- same bus, working fine
+[10.31s] attiny: write reg=0x83 failed -110
+[32.13s] attiny: last failure
+[65.27s] edt_ft5x06 0-0038: probe succeeds
+```
+
+`pca953x` shares the bus and bound cleanly *before* the failures began, and the
+touch controller's failure is downstream - its reset line is driven through the
+attiny over I2C, so it cannot probe while the attiny is unresponsive.
+
+So the evidence now points at the **panel controller alone being unresponsive**,
+not a dead bus. That also explains the warm-reboot immunity better than a bus
+fault does: across a warm reboot the controller stays powered and running.
+
+This matters because it changes the fix: an unready device needs patience in
+the driver, a stuck bus needs I2C bus recovery. The experiment that settles it
+is in [../docs/BUG-STRATEGY.md](../docs/BUG-STRATEGY.md).
 
 ---
 
