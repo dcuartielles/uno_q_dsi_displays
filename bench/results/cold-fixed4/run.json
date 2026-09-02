@@ -3,7 +3,7 @@
   "suite": "boot",
   "iterations": 10,
   "started": "2026-09-02T22:13:32",
-  "host": "192.168.50.61",
+  "host": "<BOARD-IP>",
   "manual_power": true,
   "notes": "FIX v2 + harness remote() no longer uses pipes. Baseline before fix: 1/6",
   "baseline": {

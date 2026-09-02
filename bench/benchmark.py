@@ -522,7 +522,10 @@ def cmd_boot(args):
 
     meta = {"run_id": run_id, "suite": "boot", "iterations": args.iterations,
             "started": datetime.datetime.now().isoformat(timespec="seconds"),
-            "host": conf.get("UNOQ_HOST"), "manual_power": power.manual,
+            # The board's address is deliberately NOT recorded: these run
+            # files are committed as evidence and a LAN address is nobody
+            # else's business.
+            "manual_power": power.manual,
             "notes": args.notes}
     if board_is_up():
         rc, out, _ = remote("/home/arduino/bench/collect.sh")

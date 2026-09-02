@@ -3,7 +3,7 @@
   "suite": "boot",
   "iterations": 20,
   "started": "2026-09-02T20:36:00",
-  "host": "192.168.50.61",
+  "host": "<BOARD-IP>",
   "manual_power": true,
   "notes": "N=20 full power cycle, manual, kernel 7.0.0-g122c2c22d838, external PSU",
   "baseline": {

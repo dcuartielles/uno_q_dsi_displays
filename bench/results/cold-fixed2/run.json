@@ -3,7 +3,7 @@
   "suite": "boot",
   "iterations": 10,
   "started": "2026-09-02T21:45:53",
-  "host": "192.168.50.61",
+  "host": "<BOARD-IP>",
   "manual_power": true,
   "notes": "FIX v2: wait for attiny to answer over I2C, unblank, then re-assert backlight. Baseline was 1/6",
   "baseline": {

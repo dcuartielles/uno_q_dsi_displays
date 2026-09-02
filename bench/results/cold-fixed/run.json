@@ -3,7 +3,7 @@
   "suite": "boot",
   "iterations": 10,
   "started": "2026-09-02T21:40:02",
-  "host": "192.168.50.61",
+  "host": "<BOARD-IP>",
   "manual_power": true,
   "notes": "AFTER FIX: recovery service re-asserts backlight. Compare to cold20 (1/6 pass)",
   "baseline": {

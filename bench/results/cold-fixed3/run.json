@@ -3,7 +3,7 @@
   "suite": "boot",
   "iterations": 10,
   "started": "2026-09-02T21:57:56",
-  "host": "192.168.50.61",
+  "host": "<BOARD-IP>",
   "manual_power": true,
   "notes": "FIX v2 validated; harness now detects boots by boot_id. Baseline before fix: 1/6",
   "baseline": {
