@@ -152,24 +152,41 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ## Cold boots: known behaviour
 
-On this hardware, roughly **3 cold boots in 4** hit a Qualcomm CCI I2C fault
-that stops the panel controller's backlight write. The picture is rendered
-correctly the whole time; the screen just is not lit. `install.sh` installs a
-recovery service that waits for the controller to answer and re-asserts the
-backlight - measured at **63 seconds** into boot on an affected boot.
+**Short version: it works, and on about half of cold boots the panel lights
+immediately; on the rest it is black for ~40 seconds and then comes up.**
 
-So expect the panel to be **black for about a minute after a cold boot**, then
-come up. Measured effect, counting only boots that hit the bug:
+The cause is narrow. Writes to one register on the panel controller
+(`REG_PORTC`) fail 50-90% of the time on this hardware. When the lost write is
+the one enabling the backlight, the panel stays dark - the picture is being
+rendered correctly the whole time, it simply is not lit. `install.sh` handles
+both halves:
 
-| | panel dark | panel working |
+- the **driver patch** stops a single failed write cascading into a bus-wide
+  outage (retrying `PORTC` used to wedge the whole I2C bus for ~85 seconds,
+  which also killed the touchscreen)
+- a **recovery service** re-asserts the backlight when the enable write was one
+  of the ones lost
+
+Measured over cold boots, counting only the boots that actually hit the bug:
+
+| | panel ends up dark | panel works |
 | --- | --- | --- |
-| without the service | 5 | 0 |
-| with the service | 0 | 6 |
+| without either fix | **5** | 0 |
+| with both (this repo) | **0** | **7** |
 
-This is a workaround, not a cure: the driver bug is untouched and the proper
-fix belongs in its enable path. Full method and numbers, including how it was
-measured with a camera because no software check can see it, are in
-[bench/RESULTS.md](bench/RESULTS.md).
+Of those 7: **4 lit at boot with no help**, 3 were dark and repaired at ~38 s.
+Fisher exact two-tailed p = 0.0013. Touch also improved independently - it now
+binds at 12 s on the first probe, where it used to fail and be reloaded at 99 s.
+
+**This is not a cure.** The underlying `PORTC` write failures are untouched and
+unexplained; we stopped amplifying them and we repair the one consequence that
+matters. The properly correct fix is a deferred `REG_PWM` re-assert inside the
+driver, which would remove the userspace service and light the panel in seconds
+rather than 38.
+
+Full method, per-boot records and camera evidence - including why no software
+check can see this failure at all - are in [bench/RESULTS.md](bench/RESULTS.md),
+and the plan for the real fix is in [docs/BUG-STRATEGY.md](docs/BUG-STRATEGY.md).
 
 ---
 
