@@ -172,15 +172,29 @@ dmesg | grep -i edt_ft5
 
 ## It worked, then stopped after an update
 
-**Expected.** The modules are built against one kernel version, and a kernel
-upgrade replaces `/boot/efi/dtb/qcom/*` including the composed DTB. Re-run:
+**This should no longer happen.** The modules are registered with DKMS and are
+rebuilt automatically when a new kernel is installed. Check:
 
 ```bash
-sudo ./install.sh panels/your-panel.panel
+dkms status uno-q-dsi-panel
+```
+
+If it lists your running kernel, the modules are in place. A kernel upgrade can
+still replace the composed device tree in `/boot/efi/dtb/qcom/`, and a driver
+API change will make the DKMS rebuild fail - loudly, at upgrade time. Either
+way the fix is:
+
+```bash
+sudo ./update.sh
 sudo reboot
 ```
 
-To avoid surprise upgrades mid-project:
+`update.sh` re-fetches driver sources matching the new kernel, re-patches,
+rebuilds, and reinstalls the overlay.
+
+Pinning the kernel is no longer necessary now that DKMS rebuilds on
+upgrade, but it is still a reasonable belt-and-braces step if you are
+mid-project and want nothing to move:
 
 ```bash
 sudo apt-mark hold linux-image-$(uname -r) linux-headers-$(uname -r)

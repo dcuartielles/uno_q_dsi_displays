@@ -152,8 +152,8 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ## Cold boots: known behaviour
 
-**Short version: it works, and on about half of cold boots the panel lights
-immediately; on the rest it is black for ~40 seconds and then comes up.**
+**Short version: it works. On most cold boots the panel lights normally; on
+the rest it is black for about four seconds and then comes up.**
 
 The cause is narrow. Writes to one register on the panel controller
 (`REG_PORTC`) fail 50-90% of the time on this hardware. When the lost write is
@@ -164,8 +164,11 @@ both halves:
 - the **driver patch** stops a single failed write cascading into a bus-wide
   outage (retrying `PORTC` used to wedge the whole I2C bus for ~85 seconds,
   which also killed the touchscreen)
-- a **recovery service** re-asserts the backlight when the enable write was one
-  of the ones lost
+- the **driver repairs itself**: when the backlight write is lost it re-asserts
+  `REG_PWM` - the one register that never fails - until it sticks, typically
+  about four seconds later
+- a **recovery service** remains as a backstop, and still reloads the touch
+  driver after a bad boot
 
 Measured over cold boots, counting only the boots that actually hit the bug:
 
@@ -174,9 +177,12 @@ Measured over cold boots, counting only the boots that actually hit the bug:
 | without either fix | **5** | 0 |
 | with both (this repo) | **0** | **7** |
 
-Of those 7: **4 lit at boot with no help**, 3 were dark and repaired at ~38 s.
-Fisher exact two-tailed p = 0.0013. Touch also improved independently - it now
-binds at 12 s on the first probe, where it used to fail and be reloaded at 99 s.
+Fisher exact two-tailed p = 0.0013. Touch improved independently: it binds at
+12 s on the first probe, where it used to fail and be reloaded at 99 s.
+
+Over 8 cold boots with the in-driver repair, **every** repair was done in the
+kernel - the userspace service contributed nothing to the backlight on any of
+them.
 
 **This is not a cure.** The underlying `PORTC` write failures are untouched and
 unexplained; we stopped amplifying them and we repair the one consequence that
@@ -200,6 +206,7 @@ and the plan for the real fix is in [docs/BUG-STRATEGY.md](docs/BUG-STRATEGY.md)
 | overlay installed in the 5-inch slot | `/boot/efi/dtb/qcom/` | `uninstall.sh` |
 | carrier display enabled | `arduino-linux-config` | `uninstall.sh` |
 | `uno-q-dsi-panel-recover.service` added | `/etc/systemd/system/` | `uninstall.sh` |
+| DKMS registration, so kernel upgrades rebuild | `/usr/src/uno-q-dsi-panel-*` | `uninstall.sh` |
 
 Stock modules are kept as `*.ko.distrib`, Arduino's overlay as
 `*.dtbo.arduino-orig`. To undo everything:
@@ -208,9 +215,11 @@ Stock modules are kept as `*.ko.distrib`, Arduino's overlay as
 sudo ./uninstall.sh && sudo reboot
 ```
 
-**Kernel upgrades wipe this.** The modules are built for one kernel version and
-the composed DTB is regenerated on upgrade. After any kernel update, re-run
-`sudo ./install.sh panels/your-panel.panel`.
+**Kernel upgrades are handled.** The modules are registered with DKMS, so they
+are rebuilt automatically when a new kernel is installed - and if a future
+kernel changes a driver API the rebuild fails visibly at upgrade time rather
+than leaving you with a black screen at the next boot. If that happens, re-run
+`sudo ./update.sh`, which fetches and patches sources matching the new kernel.
 
 ---
 
@@ -218,9 +227,12 @@ the composed DTB is regenerated on upgrade. After any kernel update, re-run
 
 ```
 install.sh / uninstall.sh     one-shot install and full revert
+update.sh                     bring an existing install up to date
+VERSION / CHANGELOG.md        what you are running, and what changed
 panels/*.panel                panel definitions (TEMPLATE.panel to start)
 scripts/10-update-os.sh       vanilla/old image -> kernel with carrier support
 scripts/20-build-drivers.sh   fetch, patch and install the kernel modules
+scripts/25-install-dkms.sh    register with DKMS so kernel upgrades rebuild
 scripts/30-install-overlay.sh generate, compile and enable the overlay
 scripts/35-install-recovery.sh boot-recovery service for flaky-I2C boots
 scripts/40-verify.sh          post-reboot checks
