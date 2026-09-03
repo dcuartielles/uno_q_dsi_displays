@@ -29,6 +29,19 @@ fi
 rm -f /etc/modules-load.d/uno-q-dsi-panel.conf
 depmod -a
 
+step "Deregistering from DKMS"
+# Without this the DKMS-built modules stay in updates/dkms and keep overriding
+# the distribution's own, so the uninstall would not actually uninstall.
+if have_cmd dkms; then
+    for v in $(dkms status uno-q-dsi-panel 2>/dev/null | cut -d, -f1 | cut -d/ -f2 | sort -u); do
+        dkms remove "uno-q-dsi-panel/$v" --all >/dev/null 2>&1 || true
+        rm -rf "/usr/src/uno-q-dsi-panel-$v"
+        ok "removed dkms uno-q-dsi-panel/$v"
+    done
+else
+    say "  dkms not installed"
+fi
+
 step "Removing the boot-recovery service"
 if [ -f /etc/systemd/system/uno-q-dsi-panel-recover.service ]; then
     systemctl disable --now uno-q-dsi-panel-recover.service >/dev/null 2>&1 || true

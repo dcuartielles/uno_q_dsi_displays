@@ -1,0 +1,61 @@
+name: patches apply
+
+# The single most likely way this repo breaks is Arduino publishing a kernel
+# whose driver sources no longer match our patch anchors. The tools then exit
+# with "anchor not found" and every new install fails.
+#
+# install-matrix.py catches exactly that, needs no hardware, and takes seconds.
+# Running it weekly means we find out before a user does.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'      # Mondays, so a kernel bump is caught within a week
+  workflow_dispatch:
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Patches apply and are idempotent on every shipped kernel
+        run: python bench/install-matrix.py
+
+      - name: Shell scripts parse
+        run: |
+          for f in install.sh uninstall.sh update.sh scripts/*.sh lib/*.sh \
+                   bench/*.sh bench/board/*.sh; do
+            [ -e "$f" ] || continue
+            sh -n "$f" || exit 1
+          done
+          echo "all shell scripts OK"
+
+      - name: No stray control characters in scripts
+        # Writing sed backreferences through a shell heredoc has repeatedly
+        # eaten a backslash, after which Python read the remainder as an octal
+        # escape and wrote a literal 0x01 into the script. It stays valid shell,
+        # so `sh -n` passes and the damage only shows up at runtime as invalid
+        # JSON or a silently broken command.
+        run: |
+          bad=0
+          for f in install.sh uninstall.sh update.sh scripts/*.sh lib/*.sh                    bench/*.sh bench/board/*.sh tools/*.py bench/*.py; do
+            [ -e "$f" ] || continue
+            if LC_ALL=C grep -qP '[--]' "$f"; then
+              echo "control characters in $f"; bad=1
+            fi
+          done
+          [ "$bad" = 0 ] && echo "no stray control characters"
+          exit $bad
+
+      - name: Python tools parse
+        run: |
+          for f in tools/*.py bench/*.py; do
+            python -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$f" || exit 1
+          done
+          echo "all python tools OK"

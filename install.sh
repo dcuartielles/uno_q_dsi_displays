@@ -54,6 +54,7 @@ ok "Media Carrier overlays present"
 
 # -------------------------------------------------------------- install ----
 sh "$HERE/scripts/20-build-drivers.sh"   "$PANEL_DEF"
+sh "$HERE/scripts/25-install-dkms.sh"    "$PANEL_DEF"
 sh "$HERE/scripts/30-install-overlay.sh" "$PANEL_DEF"
 sh "$HERE/scripts/35-install-recovery.sh" "$PANEL_DEF"
 
