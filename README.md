@@ -187,6 +187,30 @@ It deliberately does **not** enable the display: with no panel attached that
 would disable USB-C DisplayPort in exchange for nothing. Attach the hardware
 and run `sudo ./install.sh panels/<your-panel>.panel` to finish.
 
+### Workshop mode
+
+A room full of boards that each stop at a login prompt wastes the first ten
+minutes of a session:
+
+```bash
+tools/prepare-board.sh --autologin           # boot straight to the desktop
+tools/prepare-board.sh --autologin-console   # and on tty1 as well
+```
+
+or on a board that is already set up:
+
+```bash
+sudo ./scripts/50-autologin.sh               # enable
+sudo ./scripts/50-autologin.sh --status
+sudo ./scripts/50-autologin.sh --disable     # put the login screen back
+```
+
+**This removes a login prompt**, so anyone at the screen gets the desktop -
+sensible for workshop and demo boards, not for anything on a network you care
+about. It writes a lightdm drop-in rather than editing `lightdm.conf`, so a
+package upgrade cannot silently take the setting with it, and `--disable`
+restores things exactly.
+
 ---
 
 ## Cold boots: known behaviour

@@ -42,6 +42,14 @@
 # Attach the hardware later and run:
 #
 #     sudo ./install.sh panels/<your-panel>.panel
+#
+# Workshop mode
+# -------------
+# --autologin makes the board boot straight to the desktop with no login
+# prompt, which saves the first ten minutes of a workshop. Add
+# --autologin-console to do the same on tty1. This removes a login prompt, so
+# use it for workshop and demo boards rather than anything exposed; it is
+# reversible with scripts/50-autologin.sh --disable.
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -50,6 +58,8 @@ SERIAL=""
 PROXY_PORT=3128
 SECRETS=${UNOQ_SECRETS:-$HOME/.unoq-secrets.txt}
 SKIP_OS=0
+AUTOLOGIN=0
+AUTOLOGIN_CONSOLE=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -57,7 +67,9 @@ while [ $# -gt 0 ]; do
         --serial)  SERIAL=$2; shift 2 ;;
         --port)    PROXY_PORT=$2; shift 2 ;;
         --skip-os) SKIP_OS=1; shift ;;
-        -h|--help) sed -n '2,50p' "$0"; exit 0 ;;
+        --autologin) AUTOLOGIN=1; shift ;;
+        --autologin-console) AUTOLOGIN=1; AUTOLOGIN_CONSOLE=1; shift ;;
+        -h|--help) sed -n '2,55p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
     esac
 done
@@ -228,6 +240,14 @@ if [ -n "$dkms_line" ]; then
 else
     sh_dev 'tail -12 /home/arduino/dkms.log'
     die "DKMS registration failed - see /home/arduino/dkms.log"
+fi
+
+# --------------------------------------------------------- 7. workshop mode --
+if [ "$AUTOLOGIN" = "1" ]; then
+    step "Enabling autologin (workshop mode)"
+    extra=""
+    [ "$AUTOLOGIN_CONSOLE" = "1" ] && extra="--console"
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/50-autologin.sh --user arduino $extra'"         | sed 's/^/  /' | tail -8
 fi
 
 # ----------------------------------------------------------------- summary --
