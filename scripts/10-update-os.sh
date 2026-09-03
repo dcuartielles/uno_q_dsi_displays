@@ -26,12 +26,28 @@ say  "which pulls in the newer kernel and the arduino-linux-config tool."
 
 # ---------------------------------------------------------------- network ---
 step "Checking the network"
-if ! getent hosts deb.debian.org >/dev/null 2>&1; then
-    die "No DNS. Connect Wi-Fi first, e.g.
+# What matters is whether apt can reach a repository, not whether this board
+# can resolve names itself. Behind a proxy - including the adb-reverse tunnel
+# used to update a board over USB when there is no usable Wi-Fi - the PROXY
+# does the resolving and the board has no DNS at all. Testing DNS directly
+# rejected a perfectly working setup.
+apt_proxy=$(apt-config dump 2>/dev/null | grep '^Acquire::http::Proxy ' | tr -d '";' | awk '{print $2}' | head -1)
+
+if [ -n "$apt_proxy" ] && curl -fsS -m 20 -o /dev/null -x "$apt_proxy" http://deb.debian.org/debian/dists/trixie/Release 2>/dev/null; then
+    ok "reachable through the apt proxy"
+elif getent hosts deb.debian.org >/dev/null 2>&1; then
+    ok "DNS resolves"
+else
+    die "No route to the Debian archive. Either connect Wi-Fi:
        nmcli dev wifi list
-       sudo nmcli dev wifi connect \"<SSID>\" password \"<PASSWORD>\""
+       sudo nmcli dev wifi connect \"<SSID>\" password \"<PASSWORD>\"
+
+    or, if this board is attached over USB and the host has a network,
+    tunnel through it instead - no Wi-Fi and no captive portal needed:
+       host:  python tools/usb-proxy.py
+       host:  adb reverse tcp:3128 tcp:3128
+       board: echo 'Acquire::http::Proxy \"http://127.0.0.1:3128\";'                   > /etc/apt/apt.conf.d/99usb-proxy"
 fi
-ok "DNS resolves"
 
 # ------------------------------------------------------------------ clock ---
 # The UNO Q has no RTC battery. Before NTP syncs, every repository fails

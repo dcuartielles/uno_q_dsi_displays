@@ -150,6 +150,45 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ---
 
+## Preparing several boards over USB
+
+If you have a batch to bring up to date - no Media Carrier, no panel, and no
+usable Wi-Fi - one command per board does the lot:
+
+```bash
+tools/prepare-board.sh                       # the attached board
+tools/prepare-board.sh --serial 247242846    # pick one of several
+tools/update-progress.sh --watch             # follow the OS update
+```
+
+It updates Debian, installs the kernel with Media Carrier support, then builds
+and registers the patched drivers with DKMS. About 25 minutes for a launch-era
+board, mostly unattended, and it is idempotent - run it again on a
+half-finished board and it skips what is already done.
+
+**No network needed on the board.** It lends the host's connection over USB
+(`tools/usb-proxy.py` plus `adb reverse`), which works on guest Wi-Fi behind a
+captive portal, on a corporate network, or anywhere the board itself cannot
+authenticate. Nothing is bypassed: the traffic is the host's own already
+authenticated connection.
+
+Three things it handles that catch people out by hand:
+
+- **A fresh board has no password at all.** `passwd -S` reports `NP` and the
+  account is flagged expired, so `sudo` fails with a message about token
+  manipulation that says nothing about the real cause.
+- **The clock is wrong.** There is no RTC battery, so every apt repository
+  fails signature verification with `Not live until <date>` - which reads like
+  a broken mirror. The host's clock is copied over, and again after the reboot.
+- **The USB tunnel does not survive a reboot**, and forgetting to re-establish
+  it looks like a network fault rather than a missing tunnel.
+
+It deliberately does **not** enable the display: with no panel attached that
+would disable USB-C DisplayPort in exchange for nothing. Attach the hardware
+and run `sudo ./install.sh panels/<your-panel>.panel` to finish.
+
+---
+
 ## Cold boots: known behaviour
 
 **Short version: it works. On most cold boots the panel lights normally; on
