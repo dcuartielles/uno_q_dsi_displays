@@ -183,9 +183,11 @@ Three things it handles that catch people out by hand:
 - **The USB tunnel does not survive a reboot**, and forgetting to re-establish
   it looks like a network fault rather than a missing tunnel.
 
-It deliberately does **not** enable the display: with no panel attached that
-would disable USB-C DisplayPort in exchange for nothing. Attach the hardware
-and run `sudo ./install.sh panels/<your-panel>.panel` to finish.
+It installs the overlay and enables the display too, so the board is
+**finished**: attach a Media Carrier and panel later and it comes up, with no
+second pass. Pass `--no-display` if you would rather keep DisplayPort over
+USB-C on a particular board, since the SoC has one DSI controller and the two
+cannot share it.
 
 ### Workshop mode
 

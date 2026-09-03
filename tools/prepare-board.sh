@@ -35,13 +35,15 @@
 #      it has to be re-established afterwards - easy to forget, and the failure
 #      looks like a network problem rather than a missing tunnel.
 #
-# What it deliberately does NOT do
-# --------------------------------
-# It does not install the device-tree overlay or enable the display. With no
-# panel attached that would disable USB-C DisplayPort in exchange for nothing.
-# Attach the hardware later and run:
+# The display
+# -----------
+# The overlay IS installed and the carrier display IS enabled, so the board is
+# finished: plug a Media Carrier and panel in later and it just works, with no
+# second pass. That is the whole point of preparing a board.
 #
-#     sudo ./install.sh panels/<your-panel>.panel
+# The cost is that enabling the DSI panel takes the SoC's single DSI controller
+# away from the USB-C DisplayPort bridge. If you need DisplayPort on a board
+# instead, pass --no-display.
 #
 # Workshop mode
 # -------------
@@ -60,6 +62,7 @@ SECRETS=${UNOQ_SECRETS:-$HOME/.unoq-secrets.txt}
 SKIP_OS=0
 AUTOLOGIN=0
 AUTOLOGIN_CONSOLE=0
+NO_DISPLAY=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -68,6 +71,7 @@ while [ $# -gt 0 ]; do
         --port)    PROXY_PORT=$2; shift 2 ;;
         --skip-os) SKIP_OS=1; shift ;;
         --autologin) AUTOLOGIN=1; shift ;;
+        --no-display) NO_DISPLAY=1; shift ;;
         --autologin-console) AUTOLOGIN=1; AUTOLOGIN_CONSOLE=1; shift ;;
         -h|--help) sed -n '2,55p' "$0"; exit 0 ;;
         *) echo "unknown option: $1" >&2; exit 2 ;;
@@ -121,7 +125,9 @@ if [ "$state" = "P" ]; then
     ok "already set"
 else
     warn "no password set on this board (state '$state') - setting it"
-    printf '%s\n%s\n' "$PW" "$PW" | MSYS_NO_PATHCONV=1 $ADB shell -t -t 'passwd' >/dev/null 2>&1 || true
+    # NO -t here. Forcing a PTY makes passwd wait on the terminal and never
+    # read the pipe, which hangs forever; without one it reads stdin normally.
+    printf '%s\n%s\n' "$PW" "$PW" | MSYS_NO_PATHCONV=1 $ADB shell 'passwd' >/dev/null 2>&1 || true
     state=$(sh_dev 'passwd -S $(whoami) 2>/dev/null | awk "{print \$2}"')
     [ "$state" = "P" ] || die "could not set the account password"
     ok "set (matches SUDO_PASS)"
@@ -242,7 +248,28 @@ else
     die "DKMS registration failed - see /home/arduino/dkms.log"
 fi
 
-# --------------------------------------------------------- 7. workshop mode --
+# --------------------------------------------------- 7. the display itself --
+if [ "$NO_DISPLAY" = "1" ]; then
+    warn "skipping the overlay (--no-display): DisplayPort over USB-C stays available"
+else
+    step "Installing the panel overlay and enabling the display"
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/30-install-overlay.sh $PANEL > /home/arduino/overlay.log 2>&1'" >/dev/null || true
+    if sh_dev 'tail -20 /home/arduino/overlay.log' | grep -q 'Enabling the carrier display'; then
+        ok "overlay installed, display enabled"
+    else
+        sh_dev 'tail -10 /home/arduino/overlay.log'
+        die "overlay install failed - see /home/arduino/overlay.log"
+    fi
+
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/35-install-recovery.sh $PANEL > /home/arduino/recovery.log 2>&1'" >/dev/null || true
+    if sh_dev 'systemctl is-enabled uno-q-dsi-panel-recover.service 2>/dev/null' | grep -q enabled; then
+        ok "boot-recovery service enabled"
+    else
+        warn "recovery service not enabled - see /home/arduino/recovery.log"
+    fi
+fi
+
+# --------------------------------------------------------- 8. workshop mode --
 if [ "$AUTOLOGIN" = "1" ]; then
     step "Enabling autologin (workshop mode)"
     extra=""
@@ -254,9 +281,14 @@ fi
 step "Board $SER is ready"
 sh_dev 'echo "  model  : $(tr -d "\0" < /proc/device-tree/model)"; echo "  kernel : $(uname -r)"; echo "  carrier: $(ls /boot/efi/dtb/qcom/ | grep -c carrier) overlays"; echo "  tooling: $(command -v arduino-linux-config >/dev/null && echo arduino-linux-config present || echo MISSING)"'
 printf '\n'
-echo "The display is deliberately NOT enabled: with no panel attached that"
-echo "would cost you USB-C DisplayPort for nothing. When the hardware is on:"
+if [ "$NO_DISPLAY" = "1" ]; then
+    echo "The display was NOT enabled (--no-display). To enable it later:"
+    echo "    sudo ./install.sh $PANEL && sudo reboot"
+else
+    echo "The board is finished. Plug in a Media Carrier and panel, reboot, and"
+    echo "it should come up. Verify with:"
+    echo ""
+    echo "    sudo ./scripts/40-verify.sh $PANEL"
+fi
 echo ""
-echo "    sudo ./install.sh $PANEL"
-echo "    sudo reboot"
-echo "    sudo ./scripts/40-verify.sh $PANEL"
+echo "Reboot to apply:  sudo reboot"
