@@ -82,8 +82,12 @@ MODULES="panel-simple rpi-panel-attiny-regulator"
 {
     echo "PACKAGE_NAME=\"$NAME\""
     echo "PACKAGE_VERSION=\"$VERSION\""
-    echo "MAKE[0]=\"make -C \$dkms_source_tree KVER=\$kernelver KDIR=/lib/modules/\$kernelver/build\""
-    echo "CLEAN=\"make -C \$dkms_source_tree clean KVER=\$kernelver\""
+    # No -C here. DKMS already runs make inside its own build directory, and
+    # there is no $dkms_source_tree variable - using it expanded to nothing and
+    # -C then swallowed the next argument as its directory:
+    #   make -C KVER=7.0.0-...: No such file or directory
+    echo "MAKE[0]=\"make KVER=\$kernelver KDIR=/lib/modules/\$kernelver/build\""
+    echo "CLEAN=\"make clean KVER=\$kernelver KDIR=/lib/modules/\$kernelver/build\""
     i=0
     for m in $MODULES; do
         echo "BUILT_MODULE_NAME[$i]=\"$m\""
