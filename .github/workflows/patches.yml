@@ -53,6 +53,12 @@ jobs:
           [ "$bad" = 0 ] && echo "no stray control characters"
           exit $bad
 
+      - name: Documentation agrees with the measurements
+        # The docs quote precise figures, which makes a stale one more
+        # dangerous than a missing one - people believe it. This recomputes
+        # them from bench/results and fails if any document has drifted.
+        run: python tools/check-docs.py
+
       - name: Python tools parse
         run: |
           for f in tools/*.py bench/*.py; do

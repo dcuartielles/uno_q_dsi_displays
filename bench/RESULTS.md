@@ -299,6 +299,29 @@ python bench/analyze.py bench/results/cold-fixed4
 
 ---
 
+## Keeping this honest
+
+`tools/check-docs.py` recomputes the headline figures from `results/` and fails
+CI if any document quotes a stale one. It exists because three documents in
+this repository were caught asserting things the measurements had already
+disproved - a README claiming the panel is dark for ~40 s when the in-driver
+repair had cut it to four, and two places still saying kernel upgrades break
+the install after DKMS made that untrue.
+
+Precise numbers are the reason this repository is worth reading, which is
+exactly why a stale one is worse than none: people believe it.
+
+```bash
+python tools/check-docs.py --facts   # what the measurements currently say
+python tools/check-docs.py           # verify the docs agree
+```
+
+If you change what is measured, the checker tells you which document to fix and
+what the number should be. If you change the wording, update `CLAIMS` in the
+checker so it keeps matching.
+
+---
+
 ## Reproducing
 
 ```bash

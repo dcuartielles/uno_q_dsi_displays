@@ -175,10 +175,15 @@ Measured over cold boots, counting only the boots that actually hit the bug:
 | | panel ends up dark | panel works |
 | --- | --- | --- |
 | without either fix | **5** | 0 |
-| with both (this repo) | **0** | **7** |
+| with both (this repo) | **1** | **14** |
 
-Fisher exact two-tailed p = 0.0013. Touch improved independently: it binds at
+Fisher exact two-tailed p = 0.00039. Touch improved independently: it binds at
 12 s on the first probe, where it used to fail and be reloaded at 99 s.
+
+The one remaining failure is **not explained**: the driver re-asserted the
+backlight, the write succeeded, and the panel stayed dark anyway. Two
+mechanisms were proposed and both were tested and disproved - see
+[bench/RESULTS.md](bench/RESULTS.md).
 
 Over 8 cold boots with the in-driver repair, **every** repair was done in the
 kernel - the userspace service contributed nothing to the backlight on any of
