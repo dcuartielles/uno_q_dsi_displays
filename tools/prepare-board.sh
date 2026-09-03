@@ -55,6 +55,14 @@
 set -eu
 
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+# This script needs the repository around it - it copies scripts/ and panels/
+# to the board. Running a stray copy from elsewhere silently resolves HERE to
+# somewhere useless and fails later with a confusing path error.
+if [ ! -f "$HERE/install.sh" ] || [ ! -d "$HERE/scripts" ]; then
+    echo "ERROR: run this from inside the repository (found HERE=$HERE)" >&2
+    echo "       copy it to tools/ if you need an immutable copy." >&2
+    exit 2
+fi
 PANEL=panels/waveshare-800x480.panel
 SERIAL=""
 PROXY_PORT=3128
@@ -192,7 +200,10 @@ sh_dev 'rm -rf ~/uno-q-dsi-panel && mkdir -p ~/uno-q-dsi-panel && tar xzf ~/unoq
 ok "copied to ~/uno-q-dsi-panel"
 
 # --------------------------------------------------------- 5. the OS update --
-has_carrier=$(sh_dev 'ls /boot/efi/dtb/qcom/ 2>/dev/null | grep -c carrier || echo 0')
+# grep -c always prints a count, and exits non-zero when that count is zero -
+# so a trailing "|| echo 0" appends a SECOND line and the comparison below
+# then fails with "integer expression expected". head -1 keeps it a number.
+has_carrier=$(sh_dev 'ls /boot/efi/dtb/qcom/ 2>/dev/null | grep -c carrier' | head -1)
 if [ "$SKIP_OS" = "1" ]; then
     warn "skipping the OS update (--skip-os)"
 elif [ "${has_carrier:-0}" -gt 0 ]; then

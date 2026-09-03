@@ -161,10 +161,37 @@ tools/prepare-board.sh --serial 247242846    # pick one of several
 tools/update-progress.sh --watch             # follow the OS update
 ```
 
-It updates Debian, installs the kernel with Media Carrier support, then builds
-and registers the patched drivers with DKMS. About 25 minutes for a launch-era
-board, mostly unattended, and it is idempotent - run it again on a
-half-finished board and it skips what is already done.
+About 25 minutes for a launch-era board, mostly unattended, and it is
+idempotent: run it again on a half-finished board and it skips what is already
+done, so an interrupted run costs nothing.
+
+**On the host you need:** `adb`, `python3`, and a `~/.unoq-secrets.txt`
+containing `SUDO_PASS=<the password you want on these boards>`. Nothing needs
+to be installed on the board first.
+
+What it does, in order:
+
+1. **Sets the account password.** A factory board has none - `passwd -S` reports
+   `NP` and the account is flagged expired, so `sudo` fails with a message
+   about token manipulation that says nothing about the real cause.
+2. **Sets the clock** from the host. There is no RTC battery, so a board off
+   the shelf can be months behind, and every apt repository then fails
+   signature verification with `Not live until <date>` - which reads like a
+   broken mirror.
+3. **Opens a network tunnel over USB** and points apt at it.
+4. **Updates Debian and installs `arduino-unoq`**, which brings the newer
+   kernel, the Media Carrier overlays and `arduino-linux-config`. Reboots, then
+   re-establishes the tunnel and the clock, both of which are lost across it.
+5. **Builds the patched drivers and registers them with DKMS**, so a future
+   kernel upgrade rebuilds them instead of silently leaving a black screen.
+6. **Installs the panel overlay and enables the display**, so the board is
+   finished rather than needing a second pass once hardware is attached.
+
+Afterwards, with a Media Carrier and panel connected:
+
+```bash
+sudo ./scripts/40-verify.sh panels/<your-panel>.panel
+```
 
 **No network needed on the board.** It lends the host's connection over USB
 (`tools/usb-proxy.py` plus `adb reverse`), which works on guest Wi-Fi behind a

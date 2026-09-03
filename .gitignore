@@ -29,3 +29,4 @@ bench/.kernel-cache/
 __pycache__/
 *.pyc
 bench/coldboot-debug.log
+tools/.prepare-run.sh
