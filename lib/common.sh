@@ -61,6 +61,17 @@ load_panel() {
     [ -f "$_p" ] || die "panel definition not found: $_p"
     # shellcheck disable=SC1090
     . "$_p"
+    # A panel the kernel and Arduino's overlay already support needs none of
+    # the timings, compatibles or lane counts below - we are not describing it,
+    # only selecting it. Demanding those fields would mean re-describing
+    # hardware somebody else has already described correctly.
+    if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
+        [ -n "${PANEL_ID:-}" ] || die "$_p: missing required field PANEL_ID"
+        : "${CARRIER_DISPLAY_OPTION:=5-dsi-touch-a}"
+        : "${TOUCH_ADDR:=}"
+        return 0
+    fi
+
     for _v in PANEL_ID PANEL_COMPATIBLE PANEL_C_NAME CLOCK_KHZ \
               HACTIVE HFRONT HSYNC HBACK VACTIVE VFRONT VSYNC VBACK \
               DSI_LANES DSI_FORMAT DSI_MODE_FLAGS BPC; do

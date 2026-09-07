@@ -53,6 +53,15 @@ fi
 ok "Media Carrier overlays present"
 
 # -------------------------------------------------------------- install ----
+# A panel the kernel already supports needs none of what follows. Building
+# patched drivers for it is pointless, and generating an overlay for it is
+# destructive: it would overwrite Arduino's own description with one for
+# different hardware, and the panel would come up with no connector at all.
+if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
+    sh "$HERE/scripts/15-select-stock-panel.sh" "$PANEL_DEF"
+    exit 0
+fi
+
 sh "$HERE/scripts/20-build-drivers.sh"   "$PANEL_DEF"
 sh "$HERE/scripts/25-install-dkms.sh"    "$PANEL_DEF"
 sh "$HERE/scripts/30-install-overlay.sh" "$PANEL_DEF"

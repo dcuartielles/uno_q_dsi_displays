@@ -150,6 +150,34 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ---
 
+## Which panel do you have?
+
+Two different panels, and they need opposite treatment:
+
+| | Arduino **5inch-DSI-TOUCH-A** | Waveshare 5" 800x480 |
+| --- | --- | --- |
+| panel driver | `panel-himax-hx8394` **stock** | `panel-simple` **patched** |
+| DSI lanes | 4 | 1 |
+| resolution | 720x1280 portrait | 800x480 landscape |
+| backlight | `gpio-waveshare-dsi` **stock** | `rpi-panel-attiny-regulator` **built + patched** |
+| touch | `goodix_ts` @ 0x5d **stock** | `edt-ft5x06` @ 0x38 **patched** |
+| what to run | `sudo ./install.sh panels/arduino-5in-touch-a.panel` | `sudo ./install.sh panels/waveshare-800x480.panel` |
+
+**The official Arduino panel needs nothing from this repository except
+selecting it.** Arduino ships the overlay and the kernel already has every
+driver, so the installer checks they are present, makes sure Arduino's own
+overlay is in place, and enables the display. It builds and patches nothing.
+
+That check matters, because installing a *described* panel like the Waveshare
+writes a generated overlay into Arduino's 5-inch display slot. Do that on a
+board destined for the official panel and it comes up with **no DRM connector
+at all** - the overlay describes one DSI lane, an attiny at 0x45 and a touch
+controller at 0x38, none of which are on that hardware. Selecting the official
+panel restores Arduino's overlay automatically and keeps the displaced one
+alongside it.
+
+---
+
 ## Preparing several boards over USB
 
 If you have a batch to bring up to date - no Media Carrier, no panel, and no

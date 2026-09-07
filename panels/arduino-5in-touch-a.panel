@@ -1,0 +1,36 @@
+# Arduino 5inch-DSI-TOUCH-A - the official panel for the UNO Media Carrier.
+#
+# This one needs NOTHING from this repository except selecting it. Arduino ships
+# the overlay, and every driver it needs is already in the UNO Q kernel:
+#
+#   waveshare,5.0-dsi-touch-a / himax,hx8399c  ->  panel-himax-hx8394
+#   waveshare,dsi-touch-gpio  (backlight/GPIO) ->  gpio-waveshare-dsi
+#   goodix,gt9271             (touch, 0x5d)    ->  goodix_ts
+#
+# So STOCK_SUPPORT=1 tells the installer to select Arduino's own overlay and
+# stop. It must NOT build patched drivers or replace the overlay - doing so is
+# actively harmful here: the patched build targets a completely different
+# panel (Waveshare 800x480, one DSI lane, an RPi attiny at 0x45 and an
+# edt-ft5x06 touch at 0x38), and overwriting Arduino's overlay with it leaves
+# this panel dark with no connector at all. That was a real failure, not a
+# hypothetical one.
+#
+# Verified working: connector card0-DSI-1 at 720x1280, backlight registered,
+# "Goodix Capacitive TouchScreen" bound.
+
+PANEL_ID="arduino-5in-touch-a"
+
+# Everything below this line is what makes it different from a panel we have
+# to describe ourselves.
+STOCK_SUPPORT=1
+
+# The option name arduino-linux-config already knows.
+CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
+
+# Only used to report what should appear, and to check the drivers are present
+# before promising anything.
+STOCK_MODE="720x1280"
+STOCK_PANEL_DRIVER="panel-himax-hx8394"
+STOCK_TOUCH_DRIVER="goodix_ts"
+STOCK_GPIO_DRIVER="gpio-waveshare-dsi"
+TOUCH_ADDR="0x5d"
