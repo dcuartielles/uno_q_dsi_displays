@@ -152,5 +152,57 @@ That is good news — the panel is being driven and only the numbers are off.
 
 Edit the `.panel` file and re-run `install.sh`; it rebuilds and reinstalls.
 
+## 8. Make it detectable
+
+Once the panel works, teach `scripts/detect-panel.sh` to recognise it, so the
+next person does not have to know which one they have.
+
+There is no EDID on DSI, so there is nothing to interrogate about the display
+itself. The fingerprint comes from the touch or power controller on the
+carrier's I2C bus instead. With the panel connected:
+
+```bash
+sudo ./scripts/detect-panel.sh --scan
+```
+
+That lists every address that answers. Pick one that **tells this panel apart
+from the others in `panels/`** — presence alone is often not enough. Both
+panels shipped here answer at `0x45`, for instance; only the contents differ.
+
+Then add to your `.panel` file:
+
+```sh
+DETECT_ADDR="0x5d"                # the address that identifies this panel
+DETECT_WRITE="0x81 0x40"          # register to address first; omit to read directly
+DETECT_READ="4"                   # bytes to read back (default 1)
+DETECT_EXPECT="0x39 0x31 0x31"    # expected start of the reply; "|" separates alternatives
+DETECT_NOTE="Goodix GT911 touch controller reports product ID 911"
+```
+
+Two things are worth checking before you trust it:
+
+**Does it answer with no overlay loaded?** That is the case detection exists
+for — a board straight out of the box, `display=none`, nothing bound. Test it:
+
+```bash
+sudo arduino-linux-config carrier enable media-carrier display=none
+sudo reboot
+# after it comes back
+sudo ./scripts/detect-panel.sh
+```
+
+Some controllers are held in reset until a driver releases them and will stay
+silent. The Waveshare panel's FT5x06 at `0x38` is one of these, which is why
+its fingerprint reads the ATTINY at `0x45` instead.
+
+**Is it a read?** Writes to the RPi-style ATTINY — `REG_PORTC` in particular —
+can wedge the CCI bus for over a minute; see [ROOT-CAUSE](../README.md#cold-boots-known-behaviour).
+Detection only ever writes a register address to read from, and any fingerprint
+you add should keep it that way.
+
+Leave the block out entirely if you cannot find a clean signature. The panel is
+still perfectly usable — `--select <PANEL_ID>` installs it by name, and `--list`
+shows it as needing manual selection.
+
 Please open a PR with any panel you get working — a `.panel` file is a small
 contribution that saves the next person a long evening.

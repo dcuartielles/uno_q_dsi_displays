@@ -52,3 +52,26 @@ TOUCH_INVERT_X=1
 TOUCH_INVERT_Y=1
 # gpio line on the panel controller that releases the touch reset (active low)
 TOUCH_RESET_GPIO=1
+
+# --- how detect-panel.sh recognises this panel -----------------------------
+# Not the touch controller: the FT5x06 at 0x38 is held in reset by the ATTINY
+# until a driver releases it, so on an unconfigured board it stays silent and
+# would be useless as a fingerprint. The ATTINY itself is the discriminator.
+# Its REG_ID reports 0xc3 or 0xde depending on firmware revision.
+#
+# 0x45 is occupied on the Arduino panel too, by a different chip - so the
+# address alone proves nothing and DETECT_EXPECT has to carry the weight. That
+# chip answered 0x01 bare and 0xff bound, neither of which collides here.
+#
+# Reading is safe: it is writes to this controller, specifically to REG_PORTC,
+# that wedge the CCI bus - see docs/ROOT-CAUSE.md.
+#
+# UNVERIFIED: measured values come from the Arduino panel and from the driver
+# source, not from a bare-board probe with this panel attached. Confirm with
+#   sudo ./scripts/detect-panel.sh --scan
+# and correct DETECT_EXPECT if the reply differs.
+DETECT_ADDR="0x45"
+DETECT_WRITE="0x80"               # REG_ID on the RPi-style panel ATTINY
+DETECT_READ="1"
+DETECT_EXPECT="0xc3|0xde"
+DETECT_NOTE="Raspberry Pi style panel ATTINY reports REG_ID c3/de"

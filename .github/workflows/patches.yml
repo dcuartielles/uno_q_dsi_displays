@@ -29,8 +29,7 @@ jobs:
 
       - name: Shell scripts parse
         run: |
-          for f in install.sh uninstall.sh update.sh scripts/*.sh lib/*.sh \
-                   bench/*.sh bench/board/*.sh; do
+          for f in install.sh uninstall.sh update.sh scripts/*.sh lib/*.sh                    tools/*.sh bench/*.sh bench/board/*.sh; do
             [ -e "$f" ] || continue
             sh -n "$f" || exit 1
           done
@@ -42,16 +41,30 @@ jobs:
         # escape and wrote a literal 0x01 into the script. It stays valid shell,
         # so `sh -n` passes and the damage only shows up at runtime as invalid
         # JSON or a silently broken command.
+        #
+        # The check is written in Python on purpose. Expressed as a grep pattern
+        # it had to contain the control characters it was looking for, which
+        # made this guard the one file in the repository most likely to be
+        # silently disabled by an editor that normalises them - and it was.
         run: |
-          bad=0
-          for f in install.sh uninstall.sh update.sh scripts/*.sh lib/*.sh                    bench/*.sh bench/board/*.sh tools/*.py bench/*.py; do
-            [ -e "$f" ] || continue
-            if LC_ALL=C grep -qP '[--]' "$f"; then
-              echo "control characters in $f"; bad=1
-            fi
-          done
-          [ "$bad" = 0 ] && echo "no stray control characters"
-          exit $bad
+          python - <<'PY'
+          import glob, sys
+          allowed = {0x09, 0x0a, 0x0d}
+          bad = []
+          for pat in ("install.sh", "uninstall.sh", "update.sh", "scripts/*.sh",
+                      "lib/*.sh", "tools/*.sh", "tools/*.py", "bench/*.sh",
+                      "bench/board/*.sh", "bench/*.py", "panels/*.panel",
+                      ".github/workflows/*.yml"):
+              for f in glob.glob(pat):
+                  data = open(f, "rb").read()
+                  hits = sorted({b for b in data if b < 0x20 and b not in allowed})
+                  if hits:
+                      bad.append((f, [hex(h) for h in hits]))
+          for f, hits in bad:
+              print("control characters in %s: %s" % (f, ", ".join(hits)))
+          sys.exit(1 if bad else 0)
+          PY
+          echo "no stray control characters"
 
       - name: Documentation agrees with the measurements
         # The docs quote precise figures, which makes a stale one more

@@ -4,6 +4,7 @@
 #
 #   tools/prepare-board.sh
 #   tools/prepare-board.sh --serial 247242846 --panel panels/waveshare-800x480.panel
+#   tools/prepare-board.sh --panel auto        # ask the board which panel it has
 #
 # What it is for
 # --------------
@@ -41,6 +42,18 @@
 # finished: plug a Media Carrier and panel in later and it just works, with no
 # second pass. That is the whole point of preparing a board.
 #
+# Which panel that is matters, and getting it wrong is destructive rather than
+# merely useless: the default Waveshare definition writes a generated overlay
+# into Arduino's 5-inch display slot, and a board that later meets the official
+# Arduino panel then comes up with no DRM connector at all. So --panel is
+# honoured properly here. A definition marked STOCK_SUPPORT=1 takes the short
+# path - drivers already in the kernel, Arduino's own overlay selected, nothing
+# built and nothing overwritten.
+#
+# With a carrier and panel actually attached, --panel auto asks the board which
+# one it is rather than trusting whoever typed the command. See
+# scripts/detect-panel.sh.
+#
 # The cost is that enabling the DSI panel takes the SoC's single DSI controller
 # away from the USB-C DisplayPort bridge. If you need DisplayPort on a board
 # instead, pass --no-display.
@@ -63,6 +76,7 @@ if [ ! -f "$HERE/install.sh" ] || [ ! -d "$HERE/scripts" ]; then
     echo "       copy it to tools/ if you need an immutable copy." >&2
     exit 2
 fi
+# "auto" means: ask the board once the repository is on it.
 PANEL=panels/waveshare-800x480.panel
 SERIAL=""
 PROXY_PORT=3128
@@ -199,6 +213,36 @@ rm -f "$TAR"
 sh_dev 'rm -rf ~/uno-q-dsi-panel && mkdir -p ~/uno-q-dsi-panel && tar xzf ~/unoq-repo.tgz -C ~/uno-q-dsi-panel && chmod +x ~/uno-q-dsi-panel/*.sh ~/uno-q-dsi-panel/scripts/*.sh ~/uno-q-dsi-panel/tools/*.sh' >/dev/null
 ok "copied to ~/uno-q-dsi-panel"
 
+# ------------------------------------------------------ 4b. which panel is it --
+# Resolved here rather than at the top, because "auto" needs the repository to
+# already be on the board - detect-panel.sh reads the .panel files from there.
+if [ "$PANEL" = "auto" ]; then
+    step "Asking the board which panel is connected"
+    det=$(sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/detect-panel.sh'" || true)
+    # detect-panel.sh prints "  definition: panels/<name>.panel" when it is sure.
+    found=$(printf '%s' "$det" | sed -n 's|^  definition: ||p' | head -1)
+    if [ -z "$found" ]; then
+        printf '%s' "$det" | sed 's/^/  /' | tail -8
+        die "could not identify the panel.
+    Is a Media Carrier and panel attached? Pass --panel panels/<name>.panel to
+    choose one by hand, or run scripts/detect-panel.sh --scan on the board."
+    fi
+    PANEL=$found
+    ok "detected $PANEL"
+fi
+
+[ -f "$HERE/$PANEL" ] || die "no such panel definition: $PANEL"
+
+# A panel the kernel already supports must NOT go down the build-and-overlay
+# path: generating an overlay for it overwrites Arduino's own description with
+# one for different hardware, and the panel then comes up with no connector.
+STOCK=$( . "$HERE/$PANEL"; printf '%s' "${STOCK_SUPPORT:-0}" )
+# Written as an if, not "[ ... ] && ok ...": under set -e a false test at
+# the top level is the script exit status, and the run ends right here.
+if [ "$STOCK" = "1" ]; then
+    ok "$PANEL is supported by the stock kernel - nothing will be built"
+fi
+
 # --------------------------------------------------------- 5. the OS update --
 # grep -c always prints a count, and exits non-zero when that count is zero -
 # so a trailing "|| echo 0" appends a SECOND line and the comparison below
@@ -238,30 +282,48 @@ else
 fi
 
 # ----------------------------------------------------------- 6. the drivers --
-step "Building and installing the patched drivers"
-PROXY_ENV="env http_proxy=http://127.0.0.1:$PROXY_PORT https_proxy=http://127.0.0.1:$PROXY_PORT"
-# curl does not read apt's proxy settings, so the build needs its own.
-sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && $PROXY_ENV ./scripts/20-build-drivers.sh $PANEL > /home/arduino/drivers.log 2>&1'" >/dev/null || true
-if sh_dev 'tail -3 /home/arduino/drivers.log' | grep -q 'depmod'; then
-    ok "drivers built and installed"
+if [ "$STOCK" = "1" ]; then
+    step "Drivers"
+    ok "already in the kernel - nothing to build or register"
 else
-    sh_dev 'tail -12 /home/arduino/drivers.log'
-    die "driver build failed - see /home/arduino/drivers.log"
-fi
+    step "Building and installing the patched drivers"
+    PROXY_ENV="env http_proxy=http://127.0.0.1:$PROXY_PORT https_proxy=http://127.0.0.1:$PROXY_PORT"
+    # curl does not read apt's proxy settings, so the build needs its own.
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && $PROXY_ENV ./scripts/20-build-drivers.sh $PANEL > /home/arduino/drivers.log 2>&1'" >/dev/null || true
+    if sh_dev 'tail -3 /home/arduino/drivers.log' | grep -q 'depmod'; then
+        ok "drivers built and installed"
+    else
+        sh_dev 'tail -12 /home/arduino/drivers.log'
+        die "driver build failed - see /home/arduino/drivers.log"
+    fi
 
-step "Registering with DKMS (so kernel upgrades rebuild them)"
-sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && $PROXY_ENV ./scripts/25-install-dkms.sh $PANEL > /home/arduino/dkms.log 2>&1'" >/dev/null || true
-dkms_line=$(sh_dev 'dkms status uno-q-dsi-panel 2>/dev/null | head -1')
-if [ -n "$dkms_line" ]; then
-    ok "$dkms_line"
-else
-    sh_dev 'tail -12 /home/arduino/dkms.log'
-    die "DKMS registration failed - see /home/arduino/dkms.log"
+    step "Registering with DKMS (so kernel upgrades rebuild them)"
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && $PROXY_ENV ./scripts/25-install-dkms.sh $PANEL > /home/arduino/dkms.log 2>&1'" >/dev/null || true
+    dkms_line=$(sh_dev 'dkms status uno-q-dsi-panel 2>/dev/null | head -1')
+    if [ -n "$dkms_line" ]; then
+        ok "$dkms_line"
+    else
+        sh_dev 'tail -12 /home/arduino/dkms.log'
+        die "DKMS registration failed - see /home/arduino/dkms.log"
+    fi
 fi
 
 # --------------------------------------------------- 7. the display itself --
 if [ "$NO_DISPLAY" = "1" ]; then
     warn "skipping the overlay (--no-display): DisplayPort over USB-C stays available"
+elif [ "$STOCK" = "1" ]; then
+    # Select Arduino's own overlay, and restore it if a previous install of a
+    # described panel wrote over the slot. No generation, no recovery service -
+    # the boot-recovery service exists for the Waveshare panel's ATTINY, which
+    # this hardware does not have.
+    step "Selecting the display"
+    sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/15-select-stock-panel.sh $PANEL > /home/arduino/display.log 2>&1'" >/dev/null || true
+    if sh_dev 'tail -20 /home/arduino/display.log' | grep -q 'Enabling the carrier display'; then
+        ok "display enabled, Arduino's own overlay in place"
+    else
+        sh_dev 'tail -12 /home/arduino/display.log'
+        die "could not select the display - see /home/arduino/display.log"
+    fi
 else
     step "Installing the panel overlay and enabling the display"
     sudo_dev "sh -c 'cd /home/arduino/uno-q-dsi-panel && ./scripts/30-install-overlay.sh $PANEL > /home/arduino/overlay.log 2>&1'" >/dev/null || true

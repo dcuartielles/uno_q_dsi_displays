@@ -28,14 +28,23 @@ load_panel "$PANEL_DEF"
 
 step "uno-q-dsi-panel installer"
 say "  panel      : $PANEL_ID"
-say "  compatible : $PANEL_COMPATIBLE"
-say "  mode       : ${HACTIVE}x${VACTIVE} @ ${CLOCK_KHZ} kHz, ${DSI_LANES} DSI lane(s)"
+# A stock-supported panel carries no timings of its own - it is selected, not
+# described - so printing the describe-fields would show a row of blanks.
+if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
+    say "  support    : stock kernel drivers and Arduino's own overlay"
+    say "  mode       : ${STOCK_MODE:-as shipped}"
+else
+    say "  compatible : $PANEL_COMPATIBLE"
+    say "  mode       : ${HACTIVE}x${VACTIVE} @ ${CLOCK_KHZ} kHz, ${DSI_LANES} DSI lane(s)"
+fi
 say "  touch      : ${TOUCH_ADDR:-none}"
 
 # ------------------------------------------------------------ preflight ----
 step "Preflight"
 is_uno_q || warn "this does not look like an UNO Q (model: $(tr -d '\0' < /proc/device-tree/model 2>/dev/null))"
-have_cmd curl || die "curl is required"
+# Only the describe-and-build path fetches anything; a stock panel is
+# selected with what is already on the board.
+[ "${STOCK_SUPPORT:-0}" = "1" ] || have_cmd curl || die "curl is required"
 
 say ""
 warn "POWER: the carrier needs a 5V/3A supply. A PC USB port is not enough -"

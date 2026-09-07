@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.1.0 - 2026-09-08
+
+Batch preparation, workshop boards, and a second panel - plus a way for the
+board to work out which panel it has rather than being told.
+
+### Added
+
+- **`scripts/detect-panel.sh`** - identify the connected panel over ssh or adb,
+  or select one by hand with `--select <id>`. DSI carries no EDID, so the
+  fingerprint is taken from the touch or power controller on the carrier's I2C
+  bus. It works with **no overlay loaded at all**, which is the case that
+  matters: verified on a board set to `display=none`, where the Goodix
+  controller still returned its product ID and the address the other panel uses
+  correctly NAKed. `--scan` dumps the bus for a panel nobody has described yet.
+- `DETECT_ADDR` / `DETECT_WRITE` / `DETECT_READ` / `DETECT_EXPECT` /
+  `DETECT_NOTE` in `.panel` files, so adding a detectable panel stays a
+  one-file job. A panel without them is still installable by name.
+- Support for the **official Arduino 5inch-DSI-TOUCH-A**, which needs nothing
+  from this repository except selecting it: `STOCK_SUPPORT=1` takes the short
+  path through `scripts/15-select-stock-panel.sh`, building nothing and
+  overwriting nothing.
+- `tools/prepare-board.sh` - one command per board over USB: password
+  bootstrap, clock, OS update, drivers, DKMS, overlay and display. Needs no
+  network on the board; the host lends its own through `adb reverse`.
+- `tools/usb-proxy.py`, which is how that works - useful on guest Wi-Fi behind
+  a captive portal, where a headless board has no way through.
+- `scripts/50-autologin.sh` - boot straight to the desktop, no login prompt.
+  Meant for workshop and demo boards; reversible with `--disable`.
+
+### Fixed
+
+- **`prepare-board.sh` would have damaged boards destined for the official
+  panel.** It assumed the Waveshare definition and always generated an overlay
+  into Arduino's 5-inch display slot. On that hardware the result is no DRM
+  connector at all. It now honours `--panel`, takes the stock path when the
+  definition asks for it, and accepts `--panel auto` to ask the board.
+- The installer printed a row of blank timing fields for a stock panel, and
+  demanded `curl` on a path that fetches nothing.
+- The CI guard against stray control characters **was itself written using
+  literal control characters**, making it the file most likely to be silently
+  disabled by an editor that normalises them. It is a Python check now, and it
+  covers `tools/` and `panels/` as well.
+
 ## 1.0.0 — 2026-09-03
 
 First tagged release. Panel and touchscreen work on a vanilla Arduino UNO Q

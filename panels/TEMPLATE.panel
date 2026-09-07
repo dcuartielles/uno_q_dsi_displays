@@ -73,3 +73,29 @@ TOUCH_SIZE_Y=480
 TOUCH_INVERT_X=0
 TOUCH_INVERT_Y=0
 TOUCH_RESET_GPIO=1
+
+# --- auto-detection (optional) ---------------------------------------------
+# Fill this in and scripts/detect-panel.sh can recognise the panel on sight.
+# Leave it out and the panel can still be installed by hand, with
+#   sudo ./scripts/detect-panel.sh --select <PANEL_ID>
+#
+# To find a fingerprint, connect the panel and run
+#   sudo ./scripts/detect-panel.sh --scan
+# which lists every address that answers. Choose one that tells this panel
+# apart from the others in panels/ - an address several panels share is no use
+# unless the contents differ. A touch controller's product-ID register is
+# usually the best choice, because most answer before any driver binds.
+#
+#   DETECT_ADDR    the I2C address that identifies this panel
+#   DETECT_WRITE   bytes to write first, to address a register (omit to read
+#                  straight from the device)
+#   DETECT_READ    how many bytes to read back, default 1
+#   DETECT_EXPECT  expected start of the reply; alternatives separated by "|".
+#                  Omit to match on presence alone.
+#   DETECT_NOTE    one line shown to whoever runs the detection
+#
+# DETECT_ADDR="0x5d"
+# DETECT_WRITE="0x81 0x40"
+# DETECT_READ="4"
+# DETECT_EXPECT="0x39 0x31 0x31"
+# DETECT_NOTE="Goodix GT911 touch controller reports product ID 911"

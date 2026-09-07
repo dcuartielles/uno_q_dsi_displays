@@ -57,12 +57,13 @@ git clone https://github.com/<you>/uno-q-dsi-panel.git
 cd uno-q-dsi-panel
 
 # 1. connect the panel with the board POWERED OFF, then power up
-# 2. install (updates the OS first if the board is on an old image)
-sudo ./install.sh panels/waveshare-800x480.panel
+# 2. let the board work out which panel it is, and install it
+#    (updates the OS first if the board is on an old image)
+sudo ./scripts/detect-panel.sh --apply
 sudo reboot
 
 # 3. check
-sudo ./scripts/40-verify.sh panels/waveshare-800x480.panel
+sudo ./scripts/40-verify.sh panels/<the panel it found>.panel
 sudo ./scripts/test-display.sh
 sudo ./scripts/test-touch.sh
 ```
@@ -152,7 +153,44 @@ backlight, **zero DSI errors**, and a touch input device.
 
 ## Which panel do you have?
 
-Two different panels, and they need opposite treatment:
+Ask the board:
+
+```bash
+sudo ./scripts/detect-panel.sh
+```
+
+DSI panels carry no EDID, so nothing announces itself the way a monitor does.
+What they do have is a touch or power controller on the carrier's I2C bus, and
+those differ per panel — so that is what gets fingerprinted. It works on a
+board that has never been configured, with `display=none` and no overlay
+loaded: the Goodix controller on the Arduino panel still answers with its
+product ID at that point, which is exactly when you need to know what is
+plugged in.
+
+Add `--apply` and it installs what it found. If you already know which panel
+you have, skip detection entirely:
+
+```bash
+./scripts/detect-panel.sh --list                        # what is supported
+sudo ./scripts/detect-panel.sh --select arduino-5in-touch-a
+```
+
+`--select` never touches I2C, so it works with the panel unplugged — useful
+when preparing boards in a batch before the displays arrive.
+
+Both work over ssh or adb, since the script simply runs on the board:
+
+```bash
+ssh arduino@<board> 'cd uno-q-dsi-panel && sudo ./scripts/detect-panel.sh --apply'
+
+adb -s <serial> shell 'cd ~/uno-q-dsi-panel && sudo ./scripts/detect-panel.sh --apply'
+```
+
+If nothing is recognised, `--scan` dumps every address that answers, which is
+the starting point for teaching the repository a new panel — see
+**[docs/ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md)**.
+
+### The two panels, and why they need opposite treatment
 
 | | Arduino **5inch-DSI-TOUCH-A** | Waveshare 5" 800x480 |
 | --- | --- | --- |
@@ -355,7 +393,9 @@ install.sh / uninstall.sh     one-shot install and full revert
 update.sh                     bring an existing install up to date
 VERSION / CHANGELOG.md        what you are running, and what changed
 panels/*.panel                panel definitions (TEMPLATE.panel to start)
+scripts/detect-panel.sh       identify the connected panel, or pick one by hand
 scripts/10-update-os.sh       vanilla/old image -> kernel with carrier support
+scripts/15-select-stock-panel.sh  select a panel the kernel already supports
 scripts/20-build-drivers.sh   fetch, patch and install the kernel modules
 scripts/25-install-dkms.sh    register with DKMS so kernel upgrades rebuild
 scripts/30-install-overlay.sh generate, compile and enable the overlay
