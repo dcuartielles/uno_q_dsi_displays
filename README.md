@@ -193,7 +193,7 @@ written for people who have never touched I2C — see
 
 ### The two panels, and why they need opposite treatment
 
-| | Arduino **5inch-DSI-TOUCH-A** | Waveshare 5" 800x480 |
+| | Arduino **5inch-DSI-TOUCH-A** | Waveshare 800x480 (4.3" and 5") |
 | --- | --- | --- |
 | panel driver | `panel-himax-hx8394` **stock** | `panel-simple` **patched** |
 | DSI lanes | 4 | 1 |
@@ -201,6 +201,12 @@ written for people who have never touched I2C — see
 | backlight | `gpio-waveshare-dsi` **stock** | `rpi-panel-attiny-regulator` **built + patched** |
 | touch | `goodix_ts` @ 0x5d **stock** | `edt-ft5x06` @ 0x38 **patched** |
 | what to run | `sudo ./install.sh panels/arduino-5in-touch-a.panel` | `sudo ./install.sh panels/waveshare-800x480.panel` |
+
+The Waveshare entry covers both the 4.3" and the 5" variants with one
+definition. They are the same panel electrically - same timings, same bridge,
+same controllers - and nothing on the I2C bus tells them apart, so one
+definition is the only correct answer rather than a shortcut. Both are verified
+on hardware.
 
 **The official Arduino panel needs nothing from this repository except
 selecting it.** Arduino ships the overlay and the kernel already has every

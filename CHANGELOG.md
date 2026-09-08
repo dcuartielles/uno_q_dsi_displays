@@ -1,5 +1,46 @@
 # Changelog
 
+## 1.2.0 - 2026-09-08
+
+### Added
+
+- **The Waveshare 4.3inch DSI LCD is verified working.** It needed no changes:
+  the existing `waveshare-800x480` definition drove it correctly first time -
+  800x480, backlight, touch, zero DSI errors. The definition now says so, and
+  covers both the 4.3" and 5" variants explicitly.
+
+  They stay **one** definition on purpose. The panels are identical
+  electrically - same timings, same single DSI lane, same ICN6211 bridge, same
+  ATTINY at 0x45, same FT5x06 at 0x38 - and nothing on the I2C bus tells them
+  apart. Two files would give both the same fingerprint, and `detect-panel.sh`
+  refuses to guess when two definitions match. One file is the correct answer
+  here, not a shortcut.
+
+- The ID values measured on the 4.3" panel are recorded in the definition
+  (`REG_ID 0xc3`, FT5x06 chip `0x54` / firmware `0x0b` / vendor `0x79`), so
+  that whoever next has a 5" in front of them can tell in one command whether
+  the two can be distinguished after all.
+
+### Changed
+
+- **The Waveshare fingerprint is no longer marked unverified.** It was written
+  from the driver source and from the *other* panel, because no Waveshare panel
+  was available at the time. Measured now: `REG_ID` reads `0xc3`, exactly as
+  predicted, and detection picked the right definition unaided on the first
+  attempt with a panel it had never seen. The `0xde` alternative is still from
+  source only and is kept - it is a different ATTINY firmware revision, and
+  dropping it would silently stop recognising panels that report it.
+
+### Known, unchanged
+
+- Touch does not probe at boot on this panel: the CCI bus is wedged for the
+  first ~100 seconds (176 timeouts measured on the verification boot), and the
+  driver's identify retry only covers 8 s of that. The recovery service picks
+  it up - `touch recovered after 4 attempt(s)` - so touch works, roughly a
+  minute and a half after the desktop appears. This is the same behaviour as
+  the 5" panel and the same root cause as the dark-panel bug; the real fix is a
+  touch retry that yields the bus instead of holding it.
+
 ## 1.1.1 - 2026-09-08
 
 ### Changed

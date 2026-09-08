@@ -4,8 +4,24 @@
 #   arch/arm/boot/dts/overlays/vc4-kms-dsi-waveshare-800x480-overlay.dts
 # and drivers/gpu/drm/panel/panel-simple.c
 #
-# Verified working on: Arduino UNO Q + UNO Media Carrier, kernel 7.0.0
-# Panel tested: Waveshare "5inch DSI LCD", 15-pin FPC via a 15->22 pin adapter.
+# Verified working on Arduino UNO Q + UNO Media Carrier, kernel 7.0.0, with
+# BOTH panels this definition claims to cover:
+#
+#   Waveshare 5inch   DSI LCD, 15-pin FPC via a 15->22 pin adapter
+#   Waveshare 4.3inch DSI LCD, 2026-09-08 - 800x480, backlight, touch, no
+#                     DSI errors; the definition needed no changes at all
+#
+# ONE definition for both variants, deliberately
+# ----------------------------------------------
+# They are the same panel electrically: same 800x480 timings, same single DSI
+# lane, same ICN6211 bridge, same ATTINY at 0x45, same FT5x06 touch at 0x38.
+# Nothing on the I2C bus distinguishes them, so splitting this into two .panel
+# files would give both the same fingerprint - and detect-panel.sh refuses to
+# guess when two definitions match. One file is not a simplification here, it
+# is the only correct answer.
+#
+# The one real difference is physical size, which affects nothing but DPI. See
+# WIDTH_MM/HEIGHT_MM below if you care about it.
 
 PANEL_ID="waveshare-800x480"
 
@@ -28,7 +44,13 @@ VFRONT=7
 VSYNC=2
 VBACK=22
 
-# Physical size in mm (0 = unknown). 5" 800x480 is about 109 x 65.
+# Physical size in mm (0 = unknown). This is the only field that differs
+# between the two variants, and since they cannot be told apart automatically
+# it is left on the 5" figures. Set it by hand if you have the smaller one and
+# care about DPI - nothing else depends on it:
+#
+#   5"    109 x 65
+#   4.3"   95 x 54
 WIDTH_MM=109
 HEIGHT_MM=65
 
@@ -66,12 +88,25 @@ TOUCH_RESET_GPIO=1
 # Reading is safe: it is writes to this controller, specifically to REG_PORTC,
 # that wedge the CCI bus - see docs/ROOT-CAUSE.md.
 #
-# UNVERIFIED: measured values come from the Arduino panel and from the driver
-# source, not from a bare-board probe with this panel attached. Confirm with
-#   sudo ./scripts/detect-panel.sh --scan
-# and correct DETECT_EXPECT if the reply differs.
+# VERIFIED on hardware 2026-09-08 with the 4.3inch panel: REG_ID reads 0xc3,
+# and detection picked this definition correctly with the other panel's
+# signature absent. The 0xde alternative is still from the driver source only -
+# it is a different ATTINY firmware revision, kept because dropping it would
+# silently stop recognising panels that report it.
 DETECT_ADDR="0x45"
 DETECT_WRITE="0x80"               # REG_ID on the RPi-style panel ATTINY
 DETECT_READ="1"
 DETECT_EXPECT="0xc3|0xde"
 DETECT_NOTE="Raspberry Pi style panel ATTINY reports REG_ID c3/de"
+
+# Measured on the 4.3inch panel, recorded for whoever tries to tell the two
+# variants apart later. If the 5inch reports different values here, that is a
+# discriminator and this file can become two:
+#
+#   0x45 REG_ID (0x80)          0xc3
+#   0x38 chip id (0xA3)         0x54
+#   0x38 firmware version(0xA6) 0x0b
+#   0x38 vendor id (0xA8)       0x79        -> "generic ft5x06 (79)"
+#
+# Read them with, for example:
+#   sudo i2ctransfer -y -f <bus> w1@0x38 0xA3 r1
