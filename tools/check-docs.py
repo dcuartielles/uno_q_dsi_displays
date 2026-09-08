@@ -47,7 +47,11 @@ RESULTS = os.path.join(REPO, "bench", "results")
 # Which benchmark runs represent which configuration. Stated explicitly so the
 # reader can see what is being compared, rather than inferring it from labels.
 BASELINE_RUNS = ("cold20",)          # no fixes at all
-FIXED_RUNS = ("cold-combined", "cold-inDriver")   # driver fix in place
+# cold30-v1.3.0 ran the same REG_PWM re-assert as the others, on the 4.3"
+# Waveshare rather than the 5" - electrically the same panel, same ATTINY.
+# It also carries the deferred touch bring-up, which can only reduce bus
+# contention, so if it biases this figure it biases it toward the fix.
+FIXED_RUNS = ("cold-combined", "cold-inDriver", "cold30-v1.3.0")
 
 
 def load_records():
@@ -130,8 +134,12 @@ def compute_facts():
 
     # The p-value is quoted as a decimal string, so compare digits rather than
     # floats - "0.00039" and "0.0013" differ in length as well as value.
+    #
+    # Enough decimals to survive the p-value shrinking: at five it rounded to
+    # "0.00000" once the sample grew, which compares equal to any small number
+    # and would have quietly stopped checking the claim it exists to check.
     if "fisher_p" in facts:
-        facts["fisher_p_digits"] = int(("%.5f" % facts["fisher_p"]).split(".")[1])
+        facts["fisher_p_digits"] = int(("%.7f" % facts["fisher_p"]).split(".")[1])
 
     return facts
 
@@ -145,7 +153,7 @@ CLAIMS = [
     ("README.md", "bug-hit boots working with the fixes",
      r"with both \(this repo\) \|\s*\*\*(\d+)\*\*\s*\|\s*\*\*(\d+)\*\*",
      ("fixed_bughit_dark", "fixed_bughit_lit")),
-    ("README.md", "Fisher p-value (in units of 1e-5)",
+    ("README.md", "Fisher p-value (in units of 1e-7)",
      r"Fisher exact two-tailed p = 0\.(\d+)", "fisher_p_digits"),
     ("README.md", "touch bind time",
      r"binds at\s*\n?\s*(\d+)\s*s on the first probe", "touch_bind_s"),
@@ -229,7 +237,7 @@ def main():
     print("  fixed   : %s of %s bug-hit boots left the panel dark"
           % (facts.get("fixed_bughit_dark"), facts.get("fixed_bughit_total")))
     if "fisher_p" in facts:
-        print("  fisher p = %.5f" % facts["fisher_p"])
+        print("  fisher p = %.7f" % facts["fisher_p"])
     print("")
 
     problems = check(facts, verbose=args.verbose)

@@ -346,10 +346,22 @@ Measured over cold boots, counting only the boots that actually hit the bug:
 | | panel ends up dark | panel works |
 | --- | --- | --- |
 | without either fix | **5** | 0 |
-| with both (this repo) | **1** | **14** |
+| with both (this repo) | **1** | **44** |
 
-Fisher exact two-tailed p = 0.00039. Touch improved independently: it binds at
+Fisher exact two-tailed p = 0.0000028. Touch improved independently: it binds at
 12 s on the first probe, where it used to fail and be reloaded at 99 s.
+
+Read the baseline honestly: it is **5 boots**, and it has not grown since the
+fix went in, because there is little point cold-booting a board into a bug you
+already understand. Five for five going dark is a strong signal from a small
+sample, and the confidence in this table rests more on that consistency, and on
+the mechanism being understood, than on the size of the p-value.
+
+The most recent 30 of those boots are a single unattended run on v1.3.0
+(`bench/results/cold30-v1.3.0`): **30/30 passed**, 12 of them with a badly
+wedged bus, and the touchscreen present on every one - which is also the first
+confirmation that the touch fix holds on cold boots and not only on the warm
+reboots it was developed against.
 
 The one remaining failure is **not explained**: the driver re-asserted the
 backlight, the write succeeded, and the panel stayed dark anyway. Two

@@ -6,6 +6,23 @@ a webcam because software cannot see this failure.
 
 All numbers below are from `bench/results/`. Nothing here is estimated.
 
+## Latest run: 30 cold boots on v1.3.0
+
+`bench/results/cold30-v1.3.0` — the first fully unattended run here, power cut
+by a smart plug rather than by hand, which is what made N=30 affordable.
+
+**30 / 30 passed.** 95% confidence interval 88.6% – 100%. Median time to SSH
+45 s (range 45–59 s).
+
+12 of those boots had a badly wedged bus (85–154 CCI timeouts) and every one of
+them came up lit, with the touchscreen present. That is also the first evidence
+that the deferred touch bring-up holds on **cold** boots — it was developed and
+measured against warm reboots, and until this run "it should not care how the
+bus got wedged" was reasoning, not measurement.
+
+Run on the Waveshare **4.3"** rather than the 5": electrically the same panel,
+same ATTINY, same timings.
+
 ---
 
 ## The failure

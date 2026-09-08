@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.3.1 - 2026-09-08
+
+### Measured
+
+- **30 cold boots on v1.3.0, all of them passing** — the first fully unattended
+  run in this repository, power cut by a smart plug instead of by hand, which is
+  the only reason N=30 was affordable. 12 of those boots had a badly wedged bus
+  (85–154 CCI timeouts) and every one came up lit with the touchscreen present.
+
+  This is also the first evidence that the deferred touch bring-up holds on
+  **cold** boots. It was developed against warm reboots, and until this run
+  "the mechanism should not care how the bus got wedged" was reasoning rather
+  than measurement.
+
+  The dark-panel figures move from 1 dark in 15 bug-hit boots to **1 in 45**,
+  p = 0.0000028. The baseline is still only 5 boots and the README now says so
+  out loud — five for five going dark is a strong signal from a small sample,
+  and the confidence rests on that consistency and on the mechanism being
+  understood, not on the size of the p-value.
+
+### Fixed
+
+- `tools/check-docs.py` quoted the p-value to five decimals, which rounded to
+  `0.00000` as the sample grew. That compares equal to any small number, so the
+  guard would have silently stopped checking the claim it exists to check.
+  Seven decimals now, and the printed summary matches.
+
 ## 1.3.0 - 2026-09-08
 
 ### The touchscreen now survives a wedged boot

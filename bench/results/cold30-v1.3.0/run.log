@@ -1,0 +1,91 @@
+20:41:32  power: S3PL-20112EU (gen 3) at 192.168.50.194, currently on
+20:42:43  [1/30] waiting for a NEW boot (previous boot_id 7e59c7c9)
+20:43:27  [1/30] board up after 45s; measuring (LEDs off)
+20:43:31  [1/30] recovery settled after 1s; capturing the panel
+20:44:02  [2/30] waiting for a NEW boot (previous boot_id 7cb22e5e)
+20:44:46  [2/30] board up after 45s; measuring (LEDs off)
+20:44:51  [2/30] recovery settled after 1s; capturing the panel
+20:45:20  [3/30] waiting for a NEW boot (previous boot_id fe7f48be)
+20:46:18  [3/30] board up after 58s; measuring (LEDs off)
+20:46:22  [3/30] recovery settled after 1s; capturing the panel
+20:46:52  [4/30] waiting for a NEW boot (previous boot_id a1e73067)
+20:47:50  [4/30] board up after 58s; measuring (LEDs off)
+20:47:54  [4/30] recovery settled after 1s; capturing the panel
+20:48:24  [5/30] waiting for a NEW boot (previous boot_id 7be98ae9)
+20:49:08  [5/30] board up after 45s; measuring (LEDs off)
+20:49:12  [5/30] recovery settled after 1s; capturing the panel
+20:49:42  [6/30] waiting for a NEW boot (previous boot_id 217d2951)
+20:50:40  [6/30] board up after 58s; measuring (LEDs off)
+20:50:44  [6/30] recovery settled after 1s; capturing the panel
+20:51:14  [7/30] waiting for a NEW boot (previous boot_id f3bd7670)
+20:52:02  [7/30] board up after 48s; measuring (LEDs off)
+20:52:06  [7/30] recovery settled after 1s; capturing the panel
+20:52:35  [8/30] waiting for a NEW boot (previous boot_id b54cf02c)
+20:53:20  [8/30] board up after 45s; measuring (LEDs off)
+20:53:24  [8/30] recovery settled after 1s; capturing the panel
+20:53:54  [9/30] waiting for a NEW boot (previous boot_id d3a0e009)
+20:54:52  [9/30] board up after 58s; measuring (LEDs off)
+20:54:56  [9/30] recovery settled after 1s; capturing the panel
+20:55:25  [10/30] waiting for a NEW boot (previous boot_id 4cd7e962)
+20:56:10  [10/30] board up after 45s; measuring (LEDs off)
+20:56:14  [10/30] recovery settled after 1s; capturing the panel
+20:56:44  [11/30] waiting for a NEW boot (previous boot_id 5cfc713a)
+20:57:42  [11/30] board up after 58s; measuring (LEDs off)
+20:57:46  [11/30] recovery settled after 1s; capturing the panel
+20:58:16  [12/30] waiting for a NEW boot (previous boot_id 54a07071)
+20:59:00  [12/30] board up after 45s; measuring (LEDs off)
+20:59:04  [12/30] recovery settled after 1s; capturing the panel
+20:59:34  [13/30] waiting for a NEW boot (previous boot_id f5f6be21)
+21:00:19  [13/30] board up after 45s; measuring (LEDs off)
+21:00:23  [13/30] recovery settled after 1s; capturing the panel
+21:00:52  [14/30] waiting for a NEW boot (previous boot_id d3b4abcd)
+21:01:50  [14/30] board up after 58s; measuring (LEDs off)
+21:01:55  [14/30] recovery settled after 1s; capturing the panel
+21:02:24  [15/30] waiting for a NEW boot (previous boot_id cb545295)
+21:03:09  [15/30] board up after 45s; measuring (LEDs off)
+21:03:13  [15/30] recovery settled after 1s; capturing the panel
+21:03:42  [16/30] waiting for a NEW boot (previous boot_id 724fe8e0)
+21:04:41  [16/30] board up after 59s; measuring (LEDs off)
+21:04:45  [16/30] recovery settled after 1s; capturing the panel
+21:05:15  [17/30] waiting for a NEW boot (previous boot_id 3937175d)
+21:06:13  [17/30] board up after 58s; measuring (LEDs off)
+21:06:17  [17/30] recovery settled after 1s; capturing the panel
+21:06:46  [18/30] waiting for a NEW boot (previous boot_id 1fbadda7)
+21:07:31  [18/30] board up after 45s; measuring (LEDs off)
+21:07:35  [18/30] recovery settled after 1s; capturing the panel
+21:08:04  [19/30] waiting for a NEW boot (previous boot_id ce5b7824)
+21:08:49  [19/30] board up after 45s; measuring (LEDs off)
+21:08:53  [19/30] recovery settled after 1s; capturing the panel
+21:09:24  [20/30] waiting for a NEW boot (previous boot_id 4fac4bb9)
+21:10:22  [20/30] board up after 58s; measuring (LEDs off)
+21:10:26  [20/30] recovery settled after 1s; capturing the panel
+21:10:55  [21/30] waiting for a NEW boot (previous boot_id ba95cf37)
+21:11:40  [21/30] board up after 45s; measuring (LEDs off)
+21:11:44  [21/30] recovery settled after 1s; capturing the panel
+21:12:14  [22/30] waiting for a NEW boot (previous boot_id 7e34fe24)
+21:12:58  [22/30] board up after 45s; measuring (LEDs off)
+21:13:02  [22/30] recovery settled after 1s; capturing the panel
+21:13:32  [23/30] waiting for a NEW boot (previous boot_id 7f6e2a03)
+21:14:17  [23/30] board up after 45s; measuring (LEDs off)
+21:14:21  [23/30] recovery settled after 1s; capturing the panel
+21:14:51  [24/30] waiting for a NEW boot (previous boot_id d6bc508b)
+21:15:36  [24/30] board up after 45s; measuring (LEDs off)
+21:15:40  [24/30] recovery settled after 1s; capturing the panel
+21:16:09  [25/30] waiting for a NEW boot (previous boot_id 79505653)
+21:16:54  [25/30] board up after 45s; measuring (LEDs off)
+21:16:58  [25/30] recovery settled after 1s; capturing the panel
+21:17:28  [26/30] waiting for a NEW boot (previous boot_id a2bfa651)
+21:18:12  [26/30] board up after 45s; measuring (LEDs off)
+21:18:16  [26/30] recovery settled after 1s; capturing the panel
+21:18:46  [27/30] waiting for a NEW boot (previous boot_id ae745829)
+21:19:44  [27/30] board up after 58s; measuring (LEDs off)
+21:19:48  [27/30] recovery settled after 1s; capturing the panel
+21:20:18  [28/30] waiting for a NEW boot (previous boot_id ddfabdaa)
+21:21:16  [28/30] board up after 58s; measuring (LEDs off)
+21:21:20  [28/30] recovery settled after 1s; capturing the panel
+21:21:50  [29/30] waiting for a NEW boot (previous boot_id ed1dd2b3)
+21:22:35  [29/30] board up after 45s; measuring (LEDs off)
+21:22:39  [29/30] recovery settled after 1s; capturing the panel
+21:23:09  [30/30] waiting for a NEW boot (previous boot_id 3155ba79)
+21:23:54  [30/30] board up after 45s; measuring (LEDs off)
+21:23:58  [30/30] recovery settled after 1s; capturing the panel
