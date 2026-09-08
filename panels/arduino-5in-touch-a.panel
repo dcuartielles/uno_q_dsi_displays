@@ -30,6 +30,13 @@ CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
 # Only used to report what should appear, and to check the drivers are present
 # before promising anything.
 STOCK_MODE="720x1280"
+
+# Checked before promising anything. Read from here rather than hardcoded in
+# the installer, because the stock panels do NOT share a panel driver - the
+# 10.1 inch is a Jadard jd9365da, this one a Himax hx8394.
+STOCK_DRIVERS="panel-himax-hx8394 gpio-waveshare-dsi goodix_ts"
+
+# Kept for anything still reading the older field names.
 STOCK_PANEL_DRIVER="panel-himax-hx8394"
 STOCK_TOUCH_DRIVER="goodix_ts"
 STOCK_GPIO_DRIVER="gpio-waveshare-dsi"

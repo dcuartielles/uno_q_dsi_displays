@@ -1,0 +1,50 @@
+# Arduino / Waveshare 10.1inch DSI-TOUCH-A
+#
+# Like the 5 inch, this needs NOTHING from this repository except selecting it.
+# Arduino ships the overlay and the UNO Q kernel has every driver:
+#
+#   jadard,jd9365da-h3        (panel)          ->  jadard-jd9365da
+#   waveshare,dsi-touch-gpio  (backlight/GPIO) ->  gpio-waveshare-dsi
+#   goodix,gt9271             (touch, 0x5d)    ->  goodix_ts
+#
+# Note the panel driver: this is a Jadard JD9365DA, NOT the Himax hx8394 the
+# 5 inch uses. The stock panels do not share a panel driver, which is why the
+# driver check is read from these files rather than hardcoded.
+#
+# Verified working 2026-09-08 on an UNO Q + Media Carrier, kernel 7.0.0:
+# connector card0-DSI-1 connected at 800x1280, /dev/fb0 800,1280, backlight
+# 0-0045 registered, Goodix-TS bound at 0x5d, panel lit (checked with a camera,
+# not merely reported by DRM).
+
+PANEL_ID="arduino-10in-touch-a"
+
+# Nothing is built, patched or generated for this panel.
+STOCK_SUPPORT=1
+
+# The option name arduino-linux-config already knows. It ships three:
+# 5-dsi-touch-a, 8-dsi-touch-a and 10-dsi-touch-a.
+CARRIER_DISPLAY_OPTION="10-dsi-touch-a"
+
+STOCK_MODE="800x1280"
+
+# Checked before promising anything: on a kernel too old to know this panel the
+# overlay would load and nothing would bind, which looks exactly like a
+# hardware fault.
+STOCK_DRIVERS="jadard-jd9365da gpio-waveshare-dsi goodix_ts"
+
+TOUCH_ADDR="0x5d"
+
+# --- how detect-panel.sh recognises this panel -----------------------------
+# The Goodix reports its model as ASCII, and it is a GT9271 here against the
+# GT911 on the 5 inch - so the two are distinguishable, which is not something
+# to take for granted: they share an address, a driver and a backlight chip,
+# and only these four bytes tell them apart.
+#
+# Measured with no matching overlay loaded (the slot still held a definition
+# for completely different hardware), so this works before the board has been
+# configured for this panel - which is exactly when it is needed.
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"                    # GT-series product ID register
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
+DETECT_NOTE="Goodix GT9271 touch controller reports product ID 9271"

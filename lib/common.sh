@@ -29,6 +29,20 @@ SLOT_DTBO="$DTB_DIR/qrb2210-arduino-imola-carrier-media-panel-5in_touch_a-dsi.dt
 SLOT_BACKUP="$SLOT_DTBO.arduino-orig"
 CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
 
+# Arduino ships an overlay per stock panel, and each display option has its own
+# slot: 5-dsi-touch-a, 8-dsi-touch-a, 10-dsi-touch-a. Only the 5 inch slot gets
+# hijacked by described panels (above); a stock panel is selected in its own.
+slot_dtbo_for() {
+    case "$1" in
+        5-dsi-touch-a)  _s=5in_touch_a ;;
+        8-dsi-touch-a)  _s=8in_touch_a ;;
+        10-dsi-touch-a) _s=10in_touch_a ;;
+        *) return 1 ;;
+    esac
+    printf '%s/qrb2210-arduino-imola-carrier-media-panel-%s-dsi.dtbo' \
+        "$DTB_DIR" "$_s"
+}
+
 BUILD_DIR="${BUILD_DIR:-$HOME/.uno-q-dsi-build}"
 STATE_DIR=/var/lib/uno-q-dsi-panel
 

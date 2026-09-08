@@ -191,16 +191,21 @@ that into a fingerprint your panel is recognised by is a walkthrough of its own,
 written for people who have never touched I2C — see
 **[Make it detectable](docs/ADDING-A-PANEL.md#8-make-it-detectable)**.
 
-### The two panels, and why they need opposite treatment
+### The panels, and why they need opposite treatment
 
-| | Arduino **5inch-DSI-TOUCH-A** | Waveshare 800x480 (4.3" and 5") |
-| --- | --- | --- |
-| panel driver | `panel-himax-hx8394` **stock** | `panel-simple` **patched** |
-| DSI lanes | 4 | 1 |
-| resolution | 720x1280 portrait | 800x480 landscape |
-| backlight | `gpio-waveshare-dsi` **stock** | `rpi-panel-attiny-regulator` **built + patched** |
-| touch | `goodix_ts` @ 0x5d **stock** | `edt-ft5x06` @ 0x38 **patched** |
-| what to run | `sudo ./install.sh panels/arduino-5in-touch-a.panel` | `sudo ./install.sh panels/waveshare-800x480.panel` |
+| | Arduino **5inch-DSI-TOUCH-A** | Arduino **10.1inch-DSI-TOUCH-A** | Waveshare 800x480 (4.3" and 5") |
+| --- | --- | --- | --- |
+| panel driver | `panel-himax-hx8394` **stock** | `jadard-jd9365da` **stock** | `panel-simple` **patched** |
+| resolution | 720x1280 portrait | 800x1280 portrait | 800x480 landscape |
+| backlight | `gpio-waveshare-dsi` **stock** | `gpio-waveshare-dsi` **stock** | `rpi-panel-attiny-regulator` **built + patched** |
+| touch | `goodix_ts` @ 0x5d (GT911) **stock** | `goodix_ts` @ 0x5d (GT9271) **stock** | `edt-ft5x06` @ 0x38 **patched** |
+| what to run | `sudo ./scripts/detect-panel.sh --apply` | same | same |
+
+The two Arduino panels share an address, a touch driver and a backlight chip.
+Only the Goodix product ID separates them - `911` against `9271` - which is
+what `detect-panel.sh` reads. Arduino also ships an **8-dsi-touch-a** overlay;
+that panel is not described here because none has been tested, and a
+fingerprint nobody has measured is worse than none.
 
 The Waveshare entry covers both the 4.3" and the 5" variants with one
 definition. They are the same panel electrically - same timings, same bridge,

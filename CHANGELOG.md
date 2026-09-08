@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.4.0 - 2026-09-08
+
+### Added
+
+- **The Arduino 10.1inch-DSI-TOUCH-A works**, and needs nothing built or
+  patched. Verified on hardware: connector `card0-DSI-1` at 800x1280,
+  `/dev/fb0` 800,1280, backlight registered, `Goodix Capacitive TouchScreen`
+  bound, zero DSI errors, and the panel confirmed lit with a camera rather than
+  taken on DRM's word.
+
+  `detect-panel.sh` identifies it unaided and correctly rejects the 5 inch,
+  which is not a given: the two share an I2C address, a touch driver and a
+  backlight chip. Only the Goodix product ID separates them - ASCII `911`
+  against `9271`, four bytes.
+
+### Fixed
+
+Three assumptions that held while the 5 inch was the only stock panel known:
+
+- **Arduino ships three display options, not one** - `5-dsi-touch-a`,
+  `8-dsi-touch-a` and `10-dsi-touch-a`, each with its own overlay. The stock
+  path assumed the 5 inch slot everywhere, because that is the slot *described*
+  panels hijack. Stock panels now use their own.
+- **The stock panels do not share a panel driver.** The 5 inch is a Himax
+  hx8394, the 10.1 inch a Jadard jd9365da. The driver check is read from the
+  `.panel` file instead of hardcoded.
+- **The driver check could not see a built-in driver.** It refused to install
+  the 10.1 inch on a board that was already running it, because
+  `jadard-jd9365da` is compiled into this kernel: `modinfo` cannot see it and
+  this kernel does not list it in `modules.builtin` either. It is visible in
+  sysfs, since a built-in driver registers at boot whether or not the hardware
+  is present. All three places are checked now, and the output says which one
+  answered.
+
+  That check exists to avoid promising a panel that will not bind - and it did
+  the opposite of its job to a panel that already had.
+
+### Not added
+
+The **8 inch** panel. Arduino ships the overlay and it would very likely work
+the same way, but none has been tested here, and shipping a fingerprint nobody
+has measured is worse than shipping none - it would match confidently and
+wrongly.
+
 ## 1.3.1 - 2026-09-08
 
 ### Measured
