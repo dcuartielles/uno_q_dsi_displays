@@ -98,3 +98,19 @@ printf 'rpi-panel-attiny-regulator\n' > /etc/modules-load.d/uno-q-dsi-panel.conf
 depmod -a
 record_state "drivers built for kernel $K from commit $COMMIT"
 ok "modules installed and depmod run"
+
+# A DKMS copy lives in updates/dkms/ and wins the modprobe search over what
+# was just written, so on a board with DKMS already registered this script
+# ALONE changes nothing that gets loaded - the build succeeds, the reboot is
+# clean, and the old driver comes back. That is a genuinely baffling half hour
+# if nobody says so.
+if have_cmd dkms && dkms status uno-q-dsi-panel 2>/dev/null | grep -q installed; then
+    say ""
+    warn "DKMS already has a copy of these modules installed, and it takes"
+    warn "precedence over what was just built. Register this build with it,"
+    warn "or the running kernel will keep loading the old one:"
+    say ""
+    say "    sudo ./scripts/25-install-dkms.sh \"$PANEL_DEF\""
+    say ""
+    say "or do both at once with:  sudo ./update.sh"
+fi
