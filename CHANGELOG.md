@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.1 - 2026-09-08
+
+### Changed
+
+- The walkthrough for making a new panel auto-detectable
+  ([ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md#8-make-it-detectable)) is written
+  for people who have never touched I2C. It went from "run `--scan`" straight to
+  a finished `DETECT_` block, which skipped the only part that needed
+  explaining. Now four steps with the real output at each one, including the
+  cheapest way to find the right address - scan again with the panel unplugged
+  and see what disappears - and the rule that fingerprints read and never write.
+
 ## 1.1.0 - 2026-09-08
 
 Batch preparation, workshop boards, and a second panel - plus a way for the
