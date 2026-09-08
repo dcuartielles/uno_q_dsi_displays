@@ -49,9 +49,31 @@ power-cycle.
 | `opencv-python`, `numpy` on the host | Image analysis. | **Yes** |
 
 **Manual power cycling works** — the harness prompts you each cycle — but it
-ties you to the desk, so plan on N≈20–30. With a smart plug (Shelly, Tasmota,
-Kasa) or a switchable USB hub, pass `--power-off-cmd` / `--power-on-cmd` and
-N=100 runs unattended in about 3½ hours.
+ties you to the desk, so plan on N≈20–30. A smart plug removes the human and
+nothing else changes, which is what makes N=100 (about 3½ hours) practical.
+
+**Shelly plugs are driven directly.** Put the address in `bench/bench.conf` and
+there is nothing else to configure — both API generations are handled, and which
+one you have is detected rather than declared:
+
+```sh
+SHELLY_HOST=192.168.1.50
+SHELLY_CHANNEL=0            # optional, default 0
+SHELLY_AUTH=user:password   # only if the device has a password set
+```
+
+Check it before betting a long run on it:
+
+```bash
+python bench/shelly.py selftest
+```
+
+That minute is worth spending. A hundred-iteration run that discovers on
+iteration 1 that the channel is wrong has wasted an evening, and the failure
+looks like a dead board rather than a mis-set plug.
+
+Any other plug or switchable USB hub still works through `--power-off-cmd` /
+`--power-on-cmd`.
 
 ---
 
@@ -103,7 +125,10 @@ Re-calibrate whenever the camera or the room lighting moves.
 # manual power cycling - you are prompted to unplug/replug
 python bench/benchmark.py boot --iterations 20 --camera 1
 
-# unattended, with a smart plug
+# unattended, with a Shelly configured in bench.conf - nothing else to pass
+python bench/benchmark.py boot --iterations 100 --camera 1 --notes "kernel 7.0.0"
+
+# or any other plug / switchable USB hub
 python bench/benchmark.py boot --iterations 100 --camera 1 \
   --power-off-cmd "curl -s http://plug/relay/0?turn=off" \
   --power-on-cmd  "curl -s http://plug/relay/0?turn=on" \

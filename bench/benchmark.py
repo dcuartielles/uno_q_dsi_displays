@@ -349,15 +349,38 @@ class Power:
     """
 
     def __init__(self, off_cmd=None, on_cmd=None, off_seconds=8,
-                 unplug_timeout=900.0):
+                 unplug_timeout=900.0, plug=None):
         self.off_cmd, self.on_cmd = off_cmd, on_cmd
         self.off_seconds = off_seconds
         self.unplug_timeout = unplug_timeout
-        self.manual = not (off_cmd and on_cmd)
+        self.plug = plug
+        self.manual = plug is None and not (off_cmd and on_cmd)
+
+    def flush(self):
+        """Get writes onto the disk before the power goes.
+
+        Only worth doing when a machine is pulling the plug, because it can do
+        it the instant the measurement ends - a human takes seconds to reach
+        the socket and the kernel has usually flushed by then. A hundred
+        unattended cycles is a hundred chances to corrupt the filesystem, and
+        losing the board mid-run costs far more than the second this takes.
+        """
+        try:
+            remote("sync", timeout=15)
+        except Exception:
+            pass
 
     def cycle(self, i, total, detect=True):
         """Cut and restore power. Returns seconds spent waiting for a human."""
+        if self.plug is not None:
+            self.flush()
+            self.plug.set(False)
+            time.sleep(self.off_seconds)
+            self.plug.set(True)
+            return 0.0
+
         if not self.manual:
+            self.flush()
             subprocess.run([SH, "-c", self.off_cmd])
             time.sleep(self.off_seconds)
             subprocess.run([SH, "-c", self.on_cmd])
@@ -526,8 +549,25 @@ def cmd_boot(args):
     global LOGFILE
     LOGFILE = os.path.join(outdir, "run.log")
 
+    plug = None
+    if args.shelly or os.environ.get("SHELLY_HOST") or conf.get("SHELLY_HOST"):
+        import shelly as shelly_mod
+        try:
+            plug = shelly_mod.from_conf(args.shelly, args.shelly_channel)
+            # Fail here rather than on iteration 1. A run that discovers the
+            # plug is unreachable after the first power cut leaves the board
+            # off and the operator none the wiser.
+            log("power: %s, currently %s"
+                % (plug.describe(), "on" if plug.is_on() else "off"))
+            if not plug.is_on():
+                plug.set(True)
+                log("power: turned the plug on before starting")
+        except shelly_mod.ShellyError as e:
+            sys.exit("Shelly plug not usable: %s\n"
+                     "Check it with:  python bench/shelly.py selftest" % e)
+
     power = Power(args.power_off_cmd, args.power_on_cmd, args.power_off_seconds,
-                  args.unplug_timeout)
+                  args.unplug_timeout, plug=plug)
 
     print("=" * 68)
     print("UNO Q panel boot-reliability benchmark")
@@ -627,6 +667,11 @@ def main():
                    help="how long to wait for the operator to pull the plug "
                         "(default 1 hour - they may not be at the desk)")
     p.add_argument("--boot-timeout", type=float, default=180.0)
+    p.add_argument("--shelly", metavar="HOST",
+                   help="drive a Shelly smart plug at this address instead of "
+                        "asking a human (default: SHELLY_HOST in bench.conf)")
+    p.add_argument("--shelly-channel", type=int, metavar="N",
+                   help="which switch on the plug (default 0)")
     p.add_argument("--power-off-cmd", help="shell command that cuts power")
     p.add_argument("--power-on-cmd", help="shell command that restores power")
     p.add_argument("--power-off-seconds", type=float, default=8.0)
