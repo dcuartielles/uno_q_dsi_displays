@@ -186,9 +186,10 @@ ssh arduino@<board> 'cd uno-q-dsi-panel && sudo ./scripts/detect-panel.sh --appl
 adb -s <serial> shell 'cd ~/uno-q-dsi-panel && sudo ./scripts/detect-panel.sh --apply'
 ```
 
-If nothing is recognised, `--scan` dumps every address that answers, which is
-the starting point for teaching the repository a new panel — see
-**[docs/ADDING-A-PANEL.md](docs/ADDING-A-PANEL.md)**.
+If nothing is recognised, `--scan` dumps every address that answers. Turning
+that into a fingerprint your panel is recognised by is a walkthrough of its own,
+written for people who have never touched I2C — see
+**[Make it detectable](docs/ADDING-A-PANEL.md#8-make-it-detectable)**.
 
 ### The two panels, and why they need opposite treatment
 

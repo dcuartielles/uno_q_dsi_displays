@@ -79,7 +79,8 @@ TOUCH_RESET_GPIO=1
 # Leave it out and the panel can still be installed by hand, with
 #   sudo ./scripts/detect-panel.sh --select <PANEL_ID>
 #
-# To find a fingerprint, connect the panel and run
+# There is a step-by-step walkthrough in docs/ADDING-A-PANEL.md, section 8,
+# which assumes no I2C knowledge. The short version: connect the panel and run
 #   sudo ./scripts/detect-panel.sh --scan
 # which lists every address that answers. Choose one that tells this panel
 # apart from the others in panels/ - an address several panels share is no use

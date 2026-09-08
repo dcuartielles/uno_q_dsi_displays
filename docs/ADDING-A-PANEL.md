@@ -155,54 +155,160 @@ Edit the `.panel` file and re-run `install.sh`; it rebuilds and reinstalls.
 ## 8. Make it detectable
 
 Once the panel works, teach `scripts/detect-panel.sh` to recognise it, so the
-next person does not have to know which one they have.
+next person does not have to know which panel they are holding.
 
-There is no EDID on DSI, so there is nothing to interrogate about the display
-itself. The fingerprint comes from the touch or power controller on the
-carrier's I2C bus instead. With the panel connected:
+You do not need to understand I2C to do this. The short version: find an
+address that answers only when your panel is plugged in, write it into your
+`.panel` file, check that detection still picks the right panel. The rest of
+this section is that, slowly.
 
-```bash
-sudo ./scripts/detect-panel.sh --scan
+### What is being detected, and why not the display
+
+DSI panels have no EDID — the thing a monitor uses to tell a computer what it
+is. There is genuinely nothing to ask the display. What these panels *do* carry
+is a touch or power controller sitting on the carrier's I2C bus, and those
+differ between panels. So that is the fingerprint: not the screen, the little
+chip next to it.
+
+### Step 1 — see what is on the bus
+
+Connect the panel, then:
+
+```
+$ sudo ./scripts/detect-panel.sh --scan
+
+==> Carrier I2C bus is i2c-0
+  UU means a driver has already claimed that address - it is still there.
+
+       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+  00:                         -- -- -- -- -- -- -- --
+  10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+  20: -- -- -- -- -- -- UU -- -- -- -- -- -- -- -- --
+  30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+  40: -- -- -- -- -- 45 -- -- -- -- -- -- -- -- -- --
+  50: -- -- -- -- -- -- -- -- -- -- -- -- -- 5d -- --
+  60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+  70: -- -- -- -- -- -- -- --
+
+==> Addresses that answer a read
+  0x26  ->  0xf5
+  0x45  ->  0x01
+  0x5d  ->  0x10
 ```
 
-That lists every address that answers. Pick one that **tells this panel apart
-from the others in `panels/`** — presence alone is often not enough. Both
-panels shipped here answer at `0x45`, for instance; only the contents differ.
+Three chips answered. `0x26` is on the carrier itself and is there with no
+panel at all, so it is no use. That leaves `0x45` and `0x5d`.
 
-Then add to your `.panel` file:
+**Run the scan again with the panel unplugged.** Whatever disappears belongs to
+the panel, and that is your candidate. It is the single most useful minute you
+can spend here, and it costs nothing.
+
+### Step 2 — write the simplest fingerprint that could work
+
+If your candidate address is not used by any other panel in `panels/`, you are
+already done. Presence alone is enough:
+
+```sh
+DETECT_ADDR="0x5d"
+DETECT_NOTE="touch controller at 0x5d, only this panel has one"
+```
+
+That is a complete, working fingerprint. Skip to step 4.
+
+### Step 3 — only if the address is shared
+
+Sometimes two panels answer at the same address with different chips behind it.
+Both panels shipped here occupy `0x45`, so for them the address proves nothing
+and the *contents* have to do the work.
+
+Most controllers have an ID register holding something recognisable. Where is
+it? Two places to look, in order:
+
+1. **The datasheet**, under a heading like "Product ID" or "Chip ID".
+2. **The Linux driver** for that chip, which has to do exactly what you are
+   doing. Search the kernel tree for the chip name and look for a `#define`
+   with `ID` in it — `goodix_ts` reads `GOODIX_REG_ID`, which is `0x8140`.
+
+Then read it by hand before committing to anything. `i2ctransfer` takes
+"write these bytes, then read this many":
+
+```
+$ sudo i2ctransfer -y -f 0 w2@0x5d 0x81 0x40 r4
+0x39 0x31 0x31 0x00
+        ^ write 2 bytes to 0x5d: the register address 0x8140, high byte first
+                          ^ then read 4 bytes back
+```
+
+`0x39 0x31 0x31` is ASCII for `911` — a Goodix GT911 saying its own name. Turn
+that into:
 
 ```sh
 DETECT_ADDR="0x5d"                # the address that identifies this panel
 DETECT_WRITE="0x81 0x40"          # register to address first; omit to read directly
 DETECT_READ="4"                   # bytes to read back (default 1)
-DETECT_EXPECT="0x39 0x31 0x31"    # expected start of the reply; "|" separates alternatives
+DETECT_EXPECT="0x39 0x31 0x31"    # expected start of the reply
 DETECT_NOTE="Goodix GT911 touch controller reports product ID 911"
 ```
 
-Two things are worth checking before you trust it:
+`DETECT_EXPECT` matches the *start* of the reply, so trailing bytes you do not
+care about can be left out. If a chip legitimately reports more than one ID,
+separate them with `|` — `DETECT_EXPECT="0xc3|0xde"`.
 
-**Does it answer with no overlay loaded?** That is the case detection exists
-for — a board straight out of the box, `display=none`, nothing bound. Test it:
+### Step 4 — check it, twice
+
+**Does it still pick the right panel?** Run detection and read the output. Every
+panel is tried, and you want exactly one `ok`:
+
+```
+$ sudo ./scripts/detect-panel.sh
+==> Looking for a known panel on i2c-0
+  ok  arduino-5in-touch-a: 0x5d replied 0x39 0x31 0x31 0x00
+  waveshare-800x480: 0x45 replied 0x01, wanted 0xc3|0xde
+```
+
+If two panels match, the tool refuses to guess and tells you so. Make
+`DETECT_EXPECT` stricter.
+
+**Does it answer on an unconfigured board?** This is the case detection exists
+for — a board out of the box, nothing installed, nobody yet knowing what is
+plugged into it. Some controllers are held in reset until a driver releases
+them and stay silent until then, which makes them useless as a fingerprint
+precisely when you need one. The Waveshare panel's FT5x06 at `0x38` is one of
+these, which is why its fingerprint reads the ATTINY at `0x45` instead.
+
+To test, take the overlay away and look again:
 
 ```bash
 sudo arduino-linux-config carrier enable media-carrier display=none
 sudo reboot
-# after it comes back
+# once it is back
 sudo ./scripts/detect-panel.sh
+# then put it back
+sudo ./scripts/detect-panel.sh --apply
+sudo reboot
 ```
 
-Some controllers are held in reset until a driver releases them and will stay
-silent. The Waveshare panel's FT5x06 at `0x38` is one of these, which is why
-its fingerprint reads the ATTINY at `0x45` instead.
+### One rule: fingerprints read, they never write
 
-**Is it a read?** Writes to the RPi-style ATTINY — `REG_PORTC` in particular —
-can wedge the CCI bus for over a minute; see [ROOT-CAUSE](../README.md#cold-boots-known-behaviour).
-Detection only ever writes a register address to read from, and any fingerprint
-you add should keep it that way.
+Writes to the RPi-style ATTINY — `REG_PORTC` above all — can wedge the whole
+CCI bus for well over a minute, and that is the root cause of the dark-panel
+bug this repository exists to fix (see
+[Cold boots: known behaviour](../README.md#cold-boots-known-behaviour)).
 
-Leave the block out entirely if you cannot find a clean signature. The panel is
-still perfectly usable — `--select <PANEL_ID>` installs it by name, and `--list`
-shows it as needing manual selection.
+`DETECT_WRITE` is for the register address you want to read *from*, and nothing
+else. Never use it to configure, reset, or wake a chip.
+
+### If you cannot find a clean signature
+
+Leave the `DETECT_` block out. Nothing breaks. The panel is installed by name
+instead, which is a perfectly normal way to use this:
+
+```bash
+sudo ./scripts/detect-panel.sh --select my-panel
+```
+
+`--list` will show it as needing manual selection, and `--select` touches no
+I2C at all, so it works with the panel unplugged.
 
 Please open a PR with any panel you get working — a `.panel` file is a small
 contribution that saves the next person a long evening.
