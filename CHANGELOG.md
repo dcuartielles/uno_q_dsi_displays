@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.7.0 - 2026-09-09
+
+### Panels can now be recognised and refused
+
+A `.panel` file may declare `UNSUPPORTED="<reason>"`. Detection then identifies
+the panel, prints the reason, and stops - and `--select`, `--apply`,
+`install.sh` and `40-verify.sh` all refuse it, because the check lives in
+`load_panel()` which every path goes through.
+
+This is more useful than not recognising the panel at all. "No known panel
+recognised" reads as "nobody has added it yet, force one of the others", and
+the old message said as much in its last line. It no longer suggests that.
+
+### Added
+
+- `panels/arduino-12in-touch-a.panel` - the **12.3 inch DSI-TOUCH-A**,
+  recognised and refused. Arduino ships overlays for 5, 8 and 10.1 inch only,
+  and this panel is **1920x720 landscape** where all three supported panels are
+  portrait. The described-panel path is not a way round it either: that
+  generator emits an overlay for Raspberry Pi style hardware (ATTINY at 0x45,
+  edt-ft5x06 at 0x38) and this panel has a waveshare GPIO chip and a Goodix.
+
+  Supporting it properly needs vendor DSI timings and a new overlay. That is
+  real work, not a `.panel` file.
+
+- Its Goodix config is on record in `bench/results/goodix/`, completing the set
+  of four:
+
+  | | resolution | config version | thresholds |
+  | --- | --- | --- | --- |
+  | 5 inch | 720x1280 | `0x46` | `5a 3c` |
+  | 8 inch | 800x1280 | `0x82` | `5f 41` |
+  | 10.1 inch | 800x1280 | `0x82` | `50 32` |
+  | 12.3 inch | **1920x720** | `0x5c` | `64 32` |
+
+  The two-stage fingerprints added in 1.6.0 rejected the 12.3 inch correctly
+  and unprompted, which is the first evidence they discriminate against a panel
+  they were not designed around.
+
+### Safety note
+
+On 2026-09-09 the 12.3 inch panel was connected to a board configured for the
+5 inch overlay - the only configuration available, since none matches it - and
+it smoked. The board was checked afterwards and is undamaged: 0 CCI timeouts,
+no over-current or regulator faults logged, carrier I2C answering normally,
+thermals normal, filesystem clean.
+
+The cause was not established, and this changelog does not claim one. Bad FPC
+seating and an incompatible power pinout are at least as plausible as the
+overlay, and nothing logged points either way. What is certain is that driving
+a panel with another panel's power-up sequence and timings had no chance of
+working, so there was nothing to gain by trying - which is what this release
+makes the tooling say out loud.
+
 ## 1.6.1 - 2026-09-09
 
 ### Fixed

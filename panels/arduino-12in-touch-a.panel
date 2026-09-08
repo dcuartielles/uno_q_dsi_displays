@@ -1,0 +1,70 @@
+# Arduino / Waveshare 12.3inch DSI-TOUCH-A - RECOGNISED, NOT SUPPORTED
+#
+# This file exists so the panel is IDENTIFIED and REFUSED, rather than falling
+# through as "no known panel" - which invites forcing another definition onto
+# it, and that is the one thing not to do here.
+#
+# Why it cannot be driven
+# -----------------------
+# Arduino ships overlays for three panels only:
+#
+#     display    none, 5-dsi-touch-a, 8-dsi-touch-a, 10-dsi-touch-a
+#
+# There is no 12.3 inch option and no matching .dtbo on the image. Nor is the
+# described-panel path a way round it: that generator emits an overlay for the
+# Raspberry Pi style hardware (an ATTINY at 0x45, an edt-ft5x06 touch at 0x38),
+# and this panel has a waveshare GPIO chip at 0x45 and a Goodix at 0x5d. It
+# would produce a description of hardware that is not present.
+#
+# The geometry is unlike anything supported. Measured from the touch
+# controller's own config block:
+#
+#     5 inch      720x1280 portrait    cfg 0x46
+#     8 inch      800x1280 portrait    cfg 0x82
+#     10.1 inch   800x1280 portrait    cfg 0x82
+#     12.3 inch   1920x720 LANDSCAPE   cfg 0x5c
+#
+# Supporting it properly needs DSI timings for the panel from the vendor and a
+# new overlay describing Goodix touch plus the waveshare GPIO chip. That is
+# real work, not a .panel file, and nothing here can substitute for it.
+#
+# A warning worth carrying
+# ------------------------
+# On 2026-09-09 this panel was connected to a board configured for the 5 inch
+# overlay - the only configuration available, since none matches it - and it
+# smoked. The board was checked afterwards and was undamaged: 0 CCI timeouts,
+# no over-current or regulator faults logged, carrier I2C answering normally,
+# thermals normal.
+#
+# The cause was not established. Bad FPC seating and an incompatible power
+# pinout are at least as plausible as the overlay, and no fault was logged that
+# points either way. What is certain is that driving it with another panel's
+# power-up sequence and timings had no chance of working, so there was nothing
+# to gain by trying.
+#
+# Do not select another panel's definition to "see what happens".
+
+PANEL_ID="arduino-12in-touch-a"
+PANEL_DESC="Arduino 12.3inch DSI-TOUCH-A (1920x720) - not supported"
+
+# Recognised so it can be refused with a reason. Anything reading this file
+# must not install it.
+UNSUPPORTED="Arduino ships no overlay for the 12.3 inch panel, and its 1920x720
+    landscape geometry matches none of the three that do. Driving it with
+    another panel's overlay cannot work. See the notes in this file."
+
+# --- how detect-panel.sh recognises it -------------------------------------
+# Same Goodix family as the 8 inch and 10.1 inch, so the product ID identifies
+# the family and the touch threshold separates this one: 0x64 here against
+# 0x5f (8 inch) and 0x50 (10.1 inch). The release threshold 0x32 is shared with
+# the 10.1 inch, which is why the first byte carries the distinction and both
+# bytes are read.
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
+DETECT_NOTE="Goodix GT9271, thresholds 64/32, 1920x720 - the unsupported 12.3 inch"
+
+DETECT2_WRITE="0x80 0x53"
+DETECT2_READ="2"
+DETECT2_EXPECT="0x64 0x32"

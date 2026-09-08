@@ -75,6 +75,16 @@ load_panel() {
     [ -f "$_p" ] || die "panel definition not found: $_p"
     # shellcheck disable=SC1090
     . "$_p"
+
+    # Some definitions exist to be recognised and refused - a panel this
+    # repository can identify but cannot drive. Check first, before the field
+    # validation below, or the refusal comes out as a confusing complaint about
+    # a missing PANEL_COMPATIBLE instead of the actual reason.
+    if [ -n "${UNSUPPORTED:-}" ]; then
+        die "${PANEL_ID:-$_p} is recognised but NOT supported:
+    $UNSUPPORTED"
+    fi
+
     # A panel the kernel and Arduino's overlay already support needs none of
     # the timings, compatibles or lane counts below - we are not describing it,
     # only selecting it. Demanding those fields would mean re-describing

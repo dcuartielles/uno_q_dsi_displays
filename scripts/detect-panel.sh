@@ -86,7 +86,10 @@ if [ "$ACTION" = list ]; then
         say ""
         desc=$(panel_field "$p" PANEL_DESC)
         say "  $C_BLD$id$C_OFF${desc:+  - $desc}"
-        if [ "$stock" = 1 ]; then
+        unsup=$(panel_field "$p" UNSUPPORTED)
+        if [ -n "$unsup" ]; then
+            say "    ${C_YEL}recognised but NOT supported${C_OFF} - see the panel file"
+        elif [ "$stock" = 1 ]; then
             say "    supported by the stock kernel and Arduino overlay"
         else
             say "    needs the patched drivers this repository builds"
@@ -96,7 +99,13 @@ if [ "$ACTION" = list ]; then
         else
             say "    detected by: nothing declared - select this one by hand"
         fi
-        say "    select with: sudo ./scripts/detect-panel.sh --select $id"
+        if [ -n "$unsup" ]; then
+            # Offering a command that will be refused is worse than
+            # offering none - it reads as a way round the refusal.
+            say "    cannot be installed by this repository"
+        else
+            say "    select with: sudo ./scripts/detect-panel.sh --select $id"
+        fi
     done
     exit 0
 fi
@@ -112,6 +121,9 @@ if [ "$ACTION" = select ]; then
     done
     [ -n "$PANEL_FILE" ] || die "no panel definition with PANEL_ID \"$SELECT_ID\".
     Run --list to see the ones this repository knows about."
+    _unsup=$(panel_field "$PANEL_FILE" UNSUPPORTED)
+    [ -z "$_unsup" ] || die "$SELECT_ID is recognised but not supported:
+    $_unsup"
     step "Installing $SELECT_ID"
     exec sh "$HERE/install.sh" "$PANEL_FILE"
 fi
@@ -262,10 +274,13 @@ set -- $MATCHES
 case $# in
   0)
     say ""
+    # Deliberately no longer suggests picking another definition. An
+    # unrecognised panel is not a panel that any of these definitions will
+    # drive, and forcing one describes hardware that is not there.
     die "no known panel recognised.
-    Run --scan to see what is actually on the bus, then add a panels/*.panel
-    file with a DETECT_ block for it. --list shows what is already known, and
-    --select <id> installs one by hand if you know which it is."
+    Run --scan to see what is on the bus, then see docs/ADDING-A-PANEL.md.
+    Do NOT install another panel's definition to see what happens: it
+    describes different hardware, and at best nothing works."
     ;;
   1) PANEL_FILE=$1 ;;
   *)
@@ -304,6 +319,21 @@ step "Detected: $FOUND_ID"
 say "  definition: panels/${PANEL_FILE##*/}"
 FOUND_NOTE=$(panel_field "$PANEL_FILE" DETECT_NOTE)
 [ -n "$FOUND_NOTE" ] && say "  matched on: $FOUND_NOTE"
+
+# Some panels are here to be recognised and refused. Saying which panel it is
+# and why it cannot be driven is far more useful than "unknown", which reads as
+# an invitation to force one of the others onto it.
+UNSUP=$(panel_field "$PANEL_FILE" UNSUPPORTED)
+if [ -n "$UNSUP" ]; then
+    say ""
+    warn "This panel is recognised but NOT supported."
+    say ""
+    printf '%s\n' "  $UNSUP"
+    say ""
+    say "  Nothing here will drive it. Installing another panel's definition"
+    say "  describes hardware that is not present and cannot help."
+    exit 4
+fi
 
 if [ "$ACTION" != apply ]; then
     say ""
