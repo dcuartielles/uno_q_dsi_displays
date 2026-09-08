@@ -1,0 +1,7 @@
+boot  timeouts  deferred  touch  bound-at   note
+1     1         0         1      11.856804  
+2     19        0         1      11.880411  
+3     143       1         1      33.776753  touchscreen came up 19664 ms into the retry window
+4     13        0         1      11.917656  
+5     96        1         1      26.858468  touchscreen came up 12500 ms into the retry window
+6     19        1         1      19.177712  touchscreen came up 5096 ms into the retry window

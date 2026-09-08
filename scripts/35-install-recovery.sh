@@ -43,6 +43,10 @@ RECOVER_BUDGET_SECONDS=150
 # How long to wait for the panel controller to become reachable before
 # re-asserting the backlight. Bus outages of 87s have been measured.
 BACKLIGHT_WAIT=150
+# How long to let the driver's own deferred retry run before reloading the
+# module. Slightly longer than its internal deadline, so the driver always
+# gets to finish or fail on its own terms first.
+DRIVER_RETRY_WAIT=160
 EOF
 ok "$CONF"
 
@@ -54,6 +58,7 @@ cat > "$HELPER" <<'EOF'
 [ -r /etc/default/uno-q-dsi-panel ] && . /etc/default/uno-q-dsi-panel
 : "${RECOVER_BUDGET_SECONDS:=150}"
 : "${BACKLIGHT_WAIT:=150}"
+: "${DRIVER_RETRY_WAIT:=160}"
 
 log() { echo "uno-q-dsi-panel: $*"; }
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
@@ -178,6 +183,31 @@ fi
 if have_touch; then
     log "touch is up"
     exit 0
+fi
+
+# The driver may already be handling this itself. Since 1.3.0 edt-ft5x06 keeps
+# retrying bring-up in the background when the bus is busy, and it recovers on
+# its own within about 30 s. Reloading the module out from under it would
+# cancel that work and start the wait again - two mechanisms fighting over one
+# bus is what caused this bug in the first place.
+#
+# So if the driver says it is still working, let it. Only step in if it gives
+# up or goes quiet.
+if dmesg 2>/dev/null | grep -q "finishing touchscreen setup in the background"; then
+    log "driver is retrying bring-up itself; waiting before intervening"
+    waited=0
+    while [ "$waited" -lt "$DRIVER_RETRY_WAIT" ]; do
+        if have_touch; then
+            log "driver recovered touch on its own after ${waited}s"
+            exit 0
+        fi
+        if dmesg 2>/dev/null | grep -q "touchscreen never answered"; then
+            log "driver gave up; taking over"
+            break
+        fi
+        sleep 5
+        waited=$((waited + 5))
+    done
 fi
 
 # Budget measured from now, so at least one attempt always happens - including

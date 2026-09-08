@@ -332,8 +332,14 @@ both halves:
 - the **driver repairs itself**: when the backlight write is lost it re-asserts
   `REG_PWM` - the one register that never fails - until it sticks, typically
   about four seconds later
-- a **recovery service** remains as a backstop, and still reloads the touch
-  driver after a bad boot
+- the **touch driver waits the bus out** instead of failing: when the bus is
+  busy, probe succeeds anyway and bring-up retries from a work item, holding
+  nothing in between. Measured over 32 warm reboots, the touchscreen survived
+  0 of 11 wedged boots before this and 5 of 5 after (p = 0.00023) - see
+  [bench/results/touch/](bench/results/touch/README.md)
+- a **recovery service** remains, because the backlight has no such
+  self-rescue. It re-asserts the backlight after lost controller writes, and
+  reloads the touch driver only as a backstop
 
 Measured over cold boots, counting only the boots that actually hit the bug:
 

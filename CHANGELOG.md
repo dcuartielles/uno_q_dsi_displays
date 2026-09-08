@@ -1,5 +1,75 @@
 # Changelog
 
+## 1.3.0 - 2026-09-08
+
+### The touchscreen now survives a wedged boot
+
+Measured over 32 warm reboots with the recovery service disabled, so that
+anything working was the driver's own doing:
+
+| | wedged boots with touch | clean boots |
+| --- | --- | --- |
+| released driver | **0 / 11** | 5 / 5 |
+| with this change | **5 / 5** | 11 / 11 |
+
+Fisher two-tailed **p = 0.00023**. Both arms were built and installed through
+the identical DKMS path; only the driver source differed. Full method and raw
+logs in [bench/results/touch/](bench/results/touch/README.md).
+
+### What changed
+
+`edt-ft5x06` stopped spinning on a bus it cannot have. Probe is split at the
+first I2C access:
+
+- a short **2 s synchronous window** catches an ordinary transient, as before
+  but shorter;
+- if only the *bus* is busy - as opposed to the device being absent - probe
+  now **succeeds anyway**, and the rest of bring-up moves to a work item
+  retrying every 5 s for up to 150 s, **holding nothing in between**.
+
+That last part is the fix. The old code spun for 8 s and gave up, and while it
+spun it starved the panel controller sharing that bus of the writes it needs to
+light the backlight. The new retry generates roughly a twentieth of the traffic
+and can wait far longer, so the two failures stop competing.
+
+The poll loop had the same problem and got the same treatment: with no touch
+IRQ on this carrier the driver polls at 60 Hz, and on a wedged boot every one of
+those is a failed transfer. It now backs off to 500 ms after four consecutive
+failures and returns to 60 Hz on the first good read. Fixing identify while
+leaving the poll loop hammering would only have moved the contention.
+
+The split point is `edt_ft5x06_ts_identify()`, the first I2C traffic, so a
+retry always resumes from a clean state rather than re-registering resources. A
+failure *after* identify is a genuine fault and is not retried.
+
+### Fixed
+
+- **The recovery service and the driver would have fought each other.** With
+  the driver now recovering at ~27 s, the service began `modprobe -r` cycling
+  at about the same moment, cancelling the driver's deferred work and
+  restarting its wait - two mechanisms competing for one bus, which is what
+  caused this bug originally. It now waits for the driver's own deadline and
+  intervenes only if the driver gives up or goes quiet.
+- `20-build-drivers.sh` warns when DKMS has an installed copy that will shadow
+  what was just built. Running that script alone on a DKMS-registered board
+  produced a clean build, a clean reboot, and no change whatsoever, because
+  DKMS's copy in `updates/dkms/` wins the modprobe search. `update.sh` always
+  ran both scripts, so only people iterating on a patch by hand were exposed.
+
+### Added
+
+- `bench/touch-boots.sh` and `bench/touch-analyze.py` - the harness and scoring
+  for the measurement above. Warm reboots reproduce the touch failure (the
+  wedge is self-inflicted by driver I2C traffic), so this needs no smart plug
+  and nobody at the socket, unlike the cold-boot benchmark.
+
+### Not fixed
+
+The dark panel. The backlight sits behind the same wedged bus and the same lost
+`REG_PORTC` writes, and nothing here touches it. `35-install-recovery.sh` still
+re-asserts the backlight on every boot that needs it and is **not** removable;
+only its touch role became a backstop.
+
 ## 1.2.0 - 2026-09-08
 
 ### Added

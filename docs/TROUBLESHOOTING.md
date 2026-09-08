@@ -130,9 +130,25 @@ dmesg | grep -c 'cci.*timeout'
 
 A healthy boot shows 0–2. Hundreds means you hit the bad case.
 
-The drivers bind perfectly if simply asked again once the bus has settled, so
-`uno-q-dsi-panel-recover.service` waits for boot to finish, checks whether the
-panel and touchscreen actually came up, and reloads the touch driver if not:
+The drivers bind perfectly if simply asked again once the bus has settled.
+
+**Since 1.3.0 the touch driver does that asking itself.** Rather than failing
+probe, it stays bound and retries bring-up from a work item every 5 s for up to
+150 s, holding no bus in between. You will see this instead of a probe failure:
+
+```
+edt_ft5x06 0-0038: I2C bus busy, finishing touchscreen setup in the background
+edt_ft5x06 0-0038: touchscreen came up 12388 ms into the retry window
+```
+
+Measured over 32 warm reboots: the touchscreen survived 0 of 11 wedged boots
+before, and 5 of 5 after (p = 0.00023). See
+[bench/results/touch/](../bench/results/touch/README.md).
+
+The backlight has no such self-rescue, so `uno-q-dsi-panel-recover.service`
+remains — it waits for boot to finish, re-asserts the backlight if the
+controller writes were lost, and reloads the touch driver as a backstop if the
+driver itself gave up:
 
 ```bash
 journalctl -u uno-q-dsi-panel-recover
