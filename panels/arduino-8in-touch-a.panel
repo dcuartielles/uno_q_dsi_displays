@@ -52,11 +52,31 @@ STOCK_DRIVERS="jadard-jd9365da gpio-waveshare-dsi goodix_ts"
 TOUCH_ADDR="0x5d"
 
 # --- how detect-panel.sh recognises this panel -----------------------------
-# Shared, deliberately, with panels/arduino-10in-touch-a.panel. Both will
-# match, and detect-panel.sh will say so and ask you to pick - see the note
-# above for why that is the right answer rather than a gap to be closed.
+# The product ID is shared with the 10.1 inch, so it identifies the family and
+# not the panel. The second stage below separates them.
 DETECT_ADDR="0x5d"
 DETECT_WRITE="0x81 0x40"                    # GT-series product ID register
 DETECT_READ="4"
 DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
-DETECT_NOTE="Goodix GT9271 - shared with the 10.1 inch, which needs a different overlay"
+DETECT_NOTE="Goodix GT9271, thresholds 5f/41 - the 10.1 inch reads 50/32"
+
+# Second stage: the product ID above is shared with the 10.1 inch, so it proves
+# the family and not the panel. These two bytes are the touch and release
+# thresholds from the controller's own config block, and they differ:
+#
+#     8 inch    0x5f 0x41
+#     10.1 inch 0x50 0x32
+#
+# They describe the PANEL, not the overlay. Shown by accident and then on
+# purpose: the 10.1 inch was read while the board still ran the 8 inch overlay,
+# and reported the 10.1 inch values regardless. The touch node in the device
+# tree carries only compatible/name/reg/reset-gpio - no config payload - so
+# there is nothing for an overlay to have written here.
+#
+# Stable across two reboots and an overlay change. Verified before trusting it,
+# because some config bytes are calibration state the controller re-derives,
+# and a fingerprint built on those would work on a bench and drift in a
+# workshop - worse than having none.
+DETECT2_WRITE="0x80 0x53"
+DETECT2_READ="2"
+DETECT2_EXPECT="0x5f 0x41"

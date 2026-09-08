@@ -40,10 +40,9 @@ TOUCH_ADDR="0x5d"
 # 5 inch, which is the only thing separating this panel from that one - they
 # share an address, a driver and a backlight chip.
 #
-# It does NOT separate this panel from the 8 inch. Measured on both, same
-# board: identical product ID, identical config version 0x82, identical touch
-# resolution, identical panel driver, identical DRM mode. Nothing on the bus
-# tells them apart.
+# It does NOT separate this panel from the 8 inch: identical product ID,
+# identical config version 0x82, identical touch resolution, identical panel
+# driver, identical DRM mode. The second stage below does separate them.
 #
 # They are NOT interchangeable, which is the trap. Running the 8 inch on this
 # overlay gives a connected connector, the right mode, the right driver, a
@@ -61,4 +60,25 @@ DETECT_ADDR="0x5d"
 DETECT_WRITE="0x81 0x40"                    # GT-series product ID register
 DETECT_READ="4"
 DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
-DETECT_NOTE="Goodix GT9271 - shared with the 8 inch, which needs a different overlay"
+DETECT_NOTE="Goodix GT9271, thresholds 50/32 - the 8 inch reads 5f/41"
+
+# Second stage: the product ID above is shared with the 8 inch, so it proves
+# the family and not the panel. These two bytes are the touch and release
+# thresholds from the controller's own config block, and they differ:
+#
+#     8 inch    0x5f 0x41
+#     10.1 inch 0x50 0x32
+#
+# They describe the PANEL, not the overlay. Shown by accident and then on
+# purpose: the 10.1 inch was read while the board still ran the 8 inch overlay,
+# and reported the 10.1 inch values regardless. The touch node in the device
+# tree carries only compatible/name/reg/reset-gpio - no config payload - so
+# there is nothing for an overlay to have written here.
+#
+# Stable across two reboots and an overlay change. Verified before trusting it,
+# because some config bytes are calibration state the controller re-derives,
+# and a fingerprint built on those would work on a bench and drift in a
+# workshop - worse than having none.
+DETECT2_WRITE="0x80 0x53"
+DETECT2_READ="2"
+DETECT2_EXPECT="0x50 0x32"

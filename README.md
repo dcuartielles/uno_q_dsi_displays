@@ -214,7 +214,19 @@ overlay and you get a connected connector, the right mode, the right driver, a
 clean `dmesg` - and a garbled picture. The timings differ; the two `.dtbo`
 files are the same size and differ visibly only in a compatible string.
 
-So detection matches both and stops, and asks you which one you have:
+Detection separates them with a **second probe**: the product ID identifies the
+family, and two threshold bytes from deeper in the Goodix config block
+(`0x8053`) separate the members - `5f 41` on the 8 inch, `50 32` on the 10.1
+inch. Both stages must match.
+
+Those bytes describe the panel, not the overlay: the 10.1 inch was read while
+the board still ran the 8 inch overlay and reported its own values regardless,
+and the touch node in the device tree carries no config payload. They are
+stable across reboots and overlay changes - checked, because some config bytes
+are calibration state and a fingerprint built on those would drift.
+
+If a panel ever matches two definitions, detection stops and asks rather than
+guessing:
 
 ```
 ==> More than one panel matches
@@ -228,9 +240,20 @@ So detection matches both and stops, and asks you which one you have:
     sudo ./scripts/detect-panel.sh --select arduino-8in-touch-a
 ```
 
-That is the right outcome rather than a gap to close. Guessing would give the
-wrong picture half the time, and **every software check would still report the
-display healthy** - which is the same trap as the dark panel, in a new place.
+Guessing there would give the wrong picture half the time, and **every software
+check would still report the display healthy** - the same trap as the dark
+panel, in a new place.
+
+Which is why there is also a step that simply looks:
+
+```bash
+sudo ./scripts/45-confirm-display.sh panels/<the panel>.panel
+```
+
+It shows colour bars, asks whether they are clean and evenly divided, and if
+you say no it lists the other panels sharing this one's signature with the
+commands to try. Ten seconds, and it is the only check in the repository that
+examines the actual picture.
 
 The Waveshare entry covers both the 4.3" and the 5" variants with one
 definition. They are the same panel electrically - same timings, same bridge,
@@ -456,8 +479,10 @@ scripts/25-install-dkms.sh    register with DKMS so kernel upgrades rebuild
 scripts/30-install-overlay.sh generate, compile and enable the overlay
 scripts/35-install-recovery.sh boot-recovery service for flaky-I2C boots
 scripts/40-verify.sh          post-reboot checks
+scripts/45-confirm-display.sh show a pattern and ask whether it looks right
 scripts/test-display.sh       colour bars on the panel
 scripts/test-touch.sh         report touch events
+tools/goodix-config.sh        dump and diff a touch controller's config
 tools/                        generators and kernel-source patchers
 bench/                        reliability benchmark (camera + cold boots)
 docs/                         adding a panel, how it works, troubleshooting

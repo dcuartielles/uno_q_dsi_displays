@@ -1,5 +1,60 @@
 # Changelog
 
+## 1.6.0 - 2026-09-08
+
+### The 8 inch and 10.1 inch can now be told apart automatically
+
+They report the same Goodix product ID, so the previous release made this a
+human choice. It does not have to be. The controller's config block carries
+panel-specific tuning past the product ID, and the two panels differ there:
+
+```
+offset   8 inch                      10.1 inch
+0x8053   0x5f 0x41                   0x50 0x32     touch / release thresholds
+0x806c   0x9a                        0xdb
+0x807c   0x9e                        0x5e
+```
+
+`.panel` files may now declare a **second probe** (`DETECT2_WRITE`,
+`DETECT2_READ`, `DETECT2_EXPECT`); both stages must match. The product ID still
+identifies the family, and the thresholds separate the members - which matters,
+because the second read alone would not exclude the 5 inch, whose value at that
+offset is unknown. Identification stays positive rather than merely
+non-contradictory.
+
+Two things were checked before trusting it, and both could have sunk it:
+
+- **It describes the panel, not the overlay.** Shown by accident and then on
+  purpose: the 10.1 inch was read while the board still ran the 8 inch overlay
+  and reported 10.1 inch values regardless. The touch node in the device tree
+  carries only `compatible/name/reg/reset-gpio` - no config payload - so there
+  is nothing for an overlay to have written.
+- **It is stable.** Identical across two reboots and an overlay change. Some
+  config bytes are calibration state the controller re-derives; a fingerprint
+  built on those would work on a bench and drift in a workshop, which is worse
+  than having none.
+
+### Added
+
+- `tools/goodix-config.sh` - dump a Goodix config block and diff two dumps. The
+  single long read that would have found this months ago fails with "Operation
+  not supported", which reads like a dead end and is actually the CCI transfer
+  size limit - the same one behind the `edt-ft5x06` short-read patch. Eight
+  bytes at a time works. Dumps for both panels are in `bench/results/goodix/`.
+- `scripts/45-confirm-display.sh` - shows a test pattern, asks whether it looks
+  right, and on "no" lists the other panels sharing this one's signature with
+  the exact commands to try. Detection can tell you which panel is attached; it
+  cannot tell you the picture came out right, and that is the failure this
+  repository keeps meeting.
+
+### Fixed
+
+- **`test-display.sh` painted nothing while the desktop was running.** Xorg
+  owns the display, so writing to `/dev/fb0` silently changed nothing - the
+  command succeeded, the screen did not move, and the obvious conclusion was a
+  broken panel. It now switches to a spare VT and back, as the benchmark's own
+  pattern tool always did.
+
 ## 1.5.0 - 2026-09-08
 
 ### The 8 inch DSI-TOUCH-A works - and must be chosen by hand

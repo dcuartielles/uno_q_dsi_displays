@@ -27,6 +27,17 @@
 #                    Several alternatives may be separated by "|".
 #                    Omit to accept any ACK - presence alone is the signal.
 #
+# A panel may add a SECOND probe, and then both must match:
+#
+#   DETECT2_ADDR     defaults to DETECT_ADDR
+#   DETECT2_WRITE / DETECT2_READ / DETECT2_EXPECT   as above
+#
+# This exists because one probe was not enough. The Arduino 8inch and 10.1inch
+# report the same Goodix product ID, so telling them apart needs a second read
+# from deeper in the config block - but that read alone would not exclude the
+# 5 inch, whose value there is unknown. Requiring both keeps the identification
+# positive rather than merely non-contradictory.
+#
 # Adding a panel is therefore one .panel file. Run --scan with the new panel
 # connected and it prints what answered, ready to turn into a fingerprint.
 set -e
@@ -220,12 +231,30 @@ for p in $(panel_files); do
         case "$got" in "$_alt"*) hit=1; break ;; esac
     done
 
-    if [ "$hit" = 1 ]; then
-        ok "$id: $addr replied $got"
-        MATCHES="$MATCHES $p"
-    else
+    if [ "$hit" != 1 ]; then
         say "  $id: $addr replied $got, wanted $want"
+        continue
     fi
+
+    # Second stage, when one probe cannot separate two panels.
+    want2=$(panel_field "$p" DETECT2_EXPECT)
+    if [ -n "$want2" ]; then
+        addr2=$(panel_field "$p" DETECT2_ADDR); addr2=${addr2:-$addr}
+        wr2=$(panel_field "$p" DETECT2_WRITE)
+        rl2=$(panel_field "$p" DETECT2_READ); rl2=${rl2:-1}
+        if ! got2=$(probe "$addr2" "$wr2" "$rl2"); then
+            say "  $id: $addr matched, but $addr2 did not answer the second probe"
+            continue
+        fi
+        case "$got2" in
+            "$want2"*) ok "$id: $addr replied $got, then $got2" ;;
+            *) say "  $id: $addr matched, second probe replied $got2, wanted $want2"
+               continue ;;
+        esac
+    else
+        ok "$id: $addr replied $got"
+    fi
+    MATCHES="$MATCHES $p"
 done
 
 # shellcheck disable=SC2086
