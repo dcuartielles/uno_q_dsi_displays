@@ -105,6 +105,16 @@ else
     ok "$(basename "$PANEL_SLOT") is untouched by this repository"
 fi
 
+# The Goodix touch controller needs a patched driver on this hardware: the CCI
+# bus refuses reads over 12 bytes and goodix.c asks for 32 at a time, so touch
+# binds, creates an input device and reports nothing. Not optional, and not
+# visible without actually touching the screen.
+case "${TOUCH_ADDR:-}" in
+    0x5d|0x5D)
+        sh "$HERE/scripts/17-install-goodix-fix.sh" "$PANEL_DEF"
+        ;;
+esac
+
 step "Enabling the carrier display"
 arduino-linux-config carrier enable media-carrier "display=$CARRIER_DISPLAY_OPTION"
 record_state "stock panel $PANEL_ID selected"

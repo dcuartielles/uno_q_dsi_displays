@@ -1,69 +1,101 @@
-# Arduino / Waveshare 12.3inch DSI-TOUCH-A - RECOGNISED, NOT SUPPORTED
+# Arduino / Waveshare 12.3inch DSI-TOUCH-A
 #
-# This file exists so the panel is IDENTIFIED and REFUSED, rather than falling
-# through as "no known panel" - which invites forcing another definition onto
-# it, and that is the one thing not to do here.
+# A third kind of panel. The kernel has no mode for it and Arduino ships no
+# overlay, so it can neither be selected like the 5/8/10.1 inch nor described
+# like the Waveshare 800x480 - this repository's generator emits Raspberry Pi
+# style hardware (an ATTINY at 0x45, an edt-ft5x06 at 0x38) and this panel has
+# a waveshare GPIO chip and a Goodix at 0x5d.
 #
-# Why it cannot be driven
-# -----------------------
-# Arduino ships overlays for three panels only:
+# What it has is a driver upstream. Raspberry Pi's tree carries the mode, the
+# DSI parameters and the vendor initialisation sequence, and that driver builds
+# against the Arduino kernel unmodified. scripts/16-install-derived-panel.sh
+# fetches it, trims it to this panel alone, builds it, and derives an overlay
+# from Arduino's own 10.1 inch one.
 #
-#     display    none, 5-dsi-touch-a, 8-dsi-touch-a, 10-dsi-touch-a
+# Where the timings live
+# ----------------------
+# Not here, and not in any device tree. Arduino's overlays carry no timings at
+# all - the panel node is a compatible string and nothing else, and the modes
+# sit inside the kernel driver keyed on that string. That is why the 8 inch and
+# 10.1 inch overlays differ by one string, and why swapping them gives a
+# garbled picture with a perfectly clean dmesg.
 #
-# There is no 12.3 inch option and no matching .dtbo on the image. Nor is the
-# described-panel path a way round it: that generator emits an overlay for the
-# Raspberry Pi style hardware (an ATTINY at 0x45, an edt-ft5x06 touch at 0x38),
-# and this panel has a waveshare GPIO chip at 0x45 and a Goodix at 0x5d. It
-# would produce a description of hardware that is not present.
+# Verified working 2026-09-09 on an UNO Q + Media Carrier, kernel 7.0.0:
+# connector card0-DSI-1 at 720x1920, clean colour bars photographed, and touch
+# confirmed by hand with the orientation correct.
 #
-# The geometry is unlike anything supported. Measured from the touch
-# controller's own config block:
+# POWER
+# -----
+# This panel needs its own 5V feed at 1A or more through its 2-pin power
+# connector - the DSI cable does not power it. Waveshare are explicit that
+# below that "it will cause the startup failure or display abnormality, and
+# staying in an abnormal state for a long time may cause permanent damage to
+# the device".
 #
-#     5 inch      720x1280 portrait    cfg 0x46
-#     8 inch      800x1280 portrait    cfg 0x82
-#     10.1 inch   800x1280 portrait    cfg 0x82
-#     12.3 inch   1920x720 LANDSCAPE   cfg 0x5c
-#
-# Supporting it properly needs DSI timings for the panel from the vendor and a
-# new overlay describing Goodix touch plus the waveshare GPIO chip. That is
-# real work, not a .panel file, and nothing here can substitute for it.
-#
-# A warning worth carrying
-# ------------------------
-# On 2026-09-09 this panel was connected to a board configured for the 5 inch
-# overlay - the only configuration available, since none matches it - and it
-# smoked. The board was checked afterwards and was undamaged: 0 CCI timeouts,
-# no over-current or regulator faults logged, carrier I2C answering normally,
-# thermals normal.
-#
-# The cause was not established. Bad FPC seating and an incompatible power
-# pinout are at least as plausible as the overlay, and no fault was logged that
-# points either way. What is certain is that driving it with another panel's
-# power-up sequence and timings had no chance of working, so there was nothing
-# to gain by trying.
-#
-# Do not select another panel's definition to "see what happens".
+# A faulty power lead looks exactly like a software fault: backlight on, no
+# picture, no errors anywhere. It cost most of an afternoon here, and the
+# driver was already correct at the time.
 
 PANEL_ID="arduino-12in-touch-a"
-PANEL_DESC="Arduino 12.3inch DSI-TOUCH-A (1920x720) - not supported"
+PANEL_DESC="Arduino 12.3inch DSI-TOUCH-A (720x1920)"
 
-# Recognised so it can be refused with a reason. Anything reading this file
-# must not install it.
-UNSUPPORTED="Arduino ships no overlay for the 12.3 inch panel, and its 1920x720
-    landscape geometry matches none of the three that do. Driving it with
-    another panel's overlay cannot work. See the notes in this file."
+# Neither stock nor described: an upstream driver plus a derived overlay.
+# install.sh routes on this.
+DERIVED_PANEL=1
+
+STOCK_MODE="720x1920"
+
+# --- the driver ------------------------------------------------------------
+# Raspberry Pi's Waveshare panel driver. Pinned to a branch rather than a
+# commit so a kernel bump does not strand it; the patcher fails loudly if the
+# file is ever restructured.
+DRIVER_URL="https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c"
+DRIVER_PATCHER="tools/patch-waveshare-12in.py"
+
+# The compatible the trimmed driver answers to - and the only one it claims,
+# which matters: untrimmed it also claims the 5, 8 and 10.1 inch panels that
+# this board already drives with built-in drivers.
+PANEL_DT_COMPATIBLE="waveshare,12.3-dsi-touch-a,4lane"
+
+# --- the overlay -----------------------------------------------------------
+# Derived from Arduino's 10.1 inch overlay, which already describes this
+# carrier correctly, and installed into the 5 inch slot because
+# arduino-linux-config hardcodes its display options and cannot register a new
+# one.
+OVERLAY_TEMPLATE_OPTION="10-dsi-touch-a"
+CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
+
+# GPIO lines on the panel's own controller at 0x45. The line numbers are
+# Arduino's; the polarity is Raspberry Pi's, because this driver sequences
+# these itself and Arduino's ACTIVE_LOW reset inverts its pulse and leaves the
+# panel held in reset - a dark screen with nothing wrong in dmesg.
+RESET_GPIO_LINE=1
+IOVCC_GPIO_LINE=4
+AVDD_GPIO_LINE=0
+
+# --- touch -----------------------------------------------------------------
+# The controller reports X along the long edge (0..1920) and Y along the short
+# one (0..720) while the framebuffer is 720x1920, so the axes are transposed
+# and one runs backwards. Not guesswork: Raspberry Pi's overlay sets exactly
+# this pair for exactly this panel variant, and it was confirmed by hand.
+TOUCH_ADDR="0x5d"
+TOUCH_SWAP_XY=1
+TOUCH_INVERT_Y=1
+
+# Checked before promising anything. goodix_ts also needs its reads split for
+# the CCI bus - scripts/17-install-goodix-fix.sh, run automatically.
+STOCK_DRIVERS="goodix_ts"
 
 # --- how detect-panel.sh recognises it -------------------------------------
-# Same Goodix family as the 8 inch and 10.1 inch, so the product ID identifies
-# the family and the touch threshold separates this one: 0x64 here against
-# 0x5f (8 inch) and 0x50 (10.1 inch). The release threshold 0x32 is shared with
-# the 10.1 inch, which is why the first byte carries the distinction and both
-# bytes are read.
+# Same Goodix family as the 8 inch and 10.1 inch, so the product ID gives the
+# family and the touch threshold separates this one: 0x64 here against 0x5f
+# (8 inch) and 0x50 (10.1 inch). The release threshold 0x32 is shared with the
+# 10.1 inch, so the first byte carries the distinction and both are read.
 DETECT_ADDR="0x5d"
 DETECT_WRITE="0x81 0x40"
 DETECT_READ="4"
 DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
-DETECT_NOTE="Goodix GT9271, thresholds 64/32, 1920x720 - the unsupported 12.3 inch"
+DETECT_NOTE="Goodix GT9271, thresholds 64/32 - the 12.3 inch (720x1920 panel)"
 
 DETECT2_WRITE="0x80 0x53"
 DETECT2_READ="2"

@@ -30,7 +30,10 @@ step "uno-q-dsi-panel installer"
 say "  panel      : $PANEL_ID"
 # A stock-supported panel carries no timings of its own - it is selected, not
 # described - so printing the describe-fields would show a row of blanks.
-if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
+if [ "${DERIVED_PANEL:-0}" = "1" ]; then
+    say "  support    : upstream driver, built here; overlay derived from ${OVERLAY_TEMPLATE_OPTION:-Arduino's}"
+    say "  mode       : ${STOCK_MODE:-see the driver}"
+elif [ "${STOCK_SUPPORT:-0}" = "1" ]; then
     say "  support    : stock kernel drivers and Arduino's own overlay"
     say "  mode       : ${STOCK_MODE:-as shipped}"
 else
@@ -66,6 +69,11 @@ ok "Media Carrier overlays present"
 # patched drivers for it is pointless, and generating an overlay for it is
 # destructive: it would overwrite Arduino's own description with one for
 # different hardware, and the panel would come up with no connector at all.
+if [ "${DERIVED_PANEL:-0}" = "1" ]; then
+    sh "$HERE/scripts/16-install-derived-panel.sh" "$PANEL_DEF"
+    exit 0
+fi
+
 if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
     sh "$HERE/scripts/15-select-stock-panel.sh" "$PANEL_DEF"
     exit 0

@@ -89,6 +89,15 @@ load_panel() {
     # the timings, compatibles or lane counts below - we are not describing it,
     # only selecting it. Demanding those fields would mean re-describing
     # hardware somebody else has already described correctly.
+    # A derived panel brings its own driver and an overlay built from one
+    # Arduino ships, so it needs none of the timings below either - those live
+    # in the driver, not the device tree.
+    if [ "${DERIVED_PANEL:-0}" = "1" ]; then
+        [ -n "${PANEL_ID:-}" ] || die "$_p: missing required field PANEL_ID"
+        : "${TOUCH_ADDR:=}"
+        return 0
+    fi
+
     if [ "${STOCK_SUPPORT:-0}" = "1" ]; then
         [ -n "${PANEL_ID:-}" ] || die "$_p: missing required field PANEL_ID"
         : "${CARRIER_DISPLAY_OPTION:=5-dsi-touch-a}"

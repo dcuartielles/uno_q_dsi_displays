@@ -1,5 +1,83 @@
 # Changelog
 
+## 1.8.0 - 2026-09-09
+
+### The 12.3 inch DSI-TOUCH-A works
+
+Display and touch, verified on hardware: connector `card0-DSI-1` at 720x1920,
+clean colour bars photographed, and touch confirmed by hand with the
+orientation correct.
+
+It is a **third kind of panel**. It cannot be selected like the 5/8/10.1 inch -
+Arduino ships no overlay and the kernel has no mode for it. It cannot be
+described either: this repository's generator emits Raspberry Pi style hardware
+(an ATTINY at 0x45, an edt-ft5x06 at 0x38) and this panel has a waveshare GPIO
+chip and a Goodix.
+
+What it has is a driver upstream, so `scripts/16-install-derived-panel.sh`
+fetches Raspberry Pi's Waveshare driver, trims it to this panel, builds it, and
+derives an overlay from Arduino's own 10.1 inch one.
+
+**The trim is not cosmetic.** Untrimmed, that driver claims seventeen
+compatible strings, three of which are the panels this board already drives
+with built-in drivers - `waveshare,5.0-dsi-touch-a`, `8.0` and `10.1`. A module
+claiming those could bind first and hand a working panel another panel's
+initialisation sequence. `tools/patch-waveshare-12in.py` cuts 2327 lines to
+441, leaving exactly one compatible.
+
+### Touch was broken on every Goodix panel, and nobody had noticed
+
+```
+Goodix-TS 0-005d: Error reading 32 bytes from 0x8158: -95
+```
+
+`-95` is `-EOPNOTSUPP`. Qualcomm's CCI controller refuses any read over **12
+bytes** - measured one byte at a time, 12 succeeds and 13 does not. `goodix.c`
+reads a 32-byte contact report per touch and a 186-byte config table at probe,
+so the driver binds, creates an input device, logs nothing at probe, and
+produces no events at all.
+
+This is the same limitation `patch-edt-ft5x06.py` exists for on the Waveshare
+panels. Same controller, same ceiling, different touch chip.
+
+**It affects the 5, 8 and 10.1 inch too.** It surfaced on the 12.3 inch only
+because that was the first panel where anybody actually put a finger on the
+glass - the others were checked for the presence of an input device, which is
+exactly what this fault leaves behind. `scripts/17-install-goodix-fix.sh` now
+runs automatically on the stock path as well.
+
+### Added
+
+- `scripts/16-install-derived-panel.sh`, `tools/derive-overlay.py`,
+  `tools/patch-waveshare-12in.py` - the derived-panel path.
+- `scripts/17-install-goodix-fix.sh`, `tools/patch-goodix.py` - CCI-sized
+  Goodix reads.
+- `panels/arduino-12in-touch-a.panel` - no longer `UNSUPPORTED`.
+
+### Three things that made this hard to see
+
+All three produced a dark or wrong screen with a completely clean `dmesg`:
+
+- **Power rails as regulators, not GPIOs.** Arduino's overlay hands the panel
+  `vccio-supply`/`vdd-supply`; the upstream driver wants `iovcc-gpio`/
+  `avdd-gpio` and sequences them itself. Worse, a `regulator-fixed` node *owns*
+  the GPIO, so the driver's request for the same line would be refused.
+- **Reset polarity.** Same line, `GPIO_ACTIVE_LOW` in Arduino's overlay against
+  `GPIO_ACTIVE_HIGH` in Raspberry Pi's - the driver's pulse comes out inverted
+  and the panel sits held in reset.
+- **Overlays are merged offline.** Replacing a `.dtbo` changes nothing until
+  `arduino-linux-config carrier enable` re-runs the merge, and a stale
+  `__local_fixups__` entry makes that merge fail *silently*, resetting the
+  display option to `none`.
+
+### And one that was not software at all
+
+The panel needs its own 5V feed at **1A or more** through a 2-pin power
+connector; the DSI cable does not power it. Waveshare are explicit that below
+that "it will cause the startup failure or display abnormality". A faulty power
+lead looks exactly like a driver bug - backlight on, no picture, no errors -
+and the driver was already correct when that was the only thing left wrong.
+
 ## 1.7.0 - 2026-09-09
 
 ### Panels can now be recognised and refused
