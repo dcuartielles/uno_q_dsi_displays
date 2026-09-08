@@ -44,14 +44,33 @@ BPP=$(cat /sys/class/graphics/fb0/bits_per_pixel)
 say "  framebuffer ${W}x${H} @ ${BPP}bpp"
 [ "$BPP" = "32" ] || warn "expected 32bpp; the patterns below assume BGRA"
 
+# A framebuffer line is STRIDE bytes, which is not always width * bpp/8. On a
+# 720-wide panel the kernel pads each line to 2944 bytes where the naive
+# calculation gives 2880, and writing the short rows shears every line 16
+# pixels further left than the last - dense diagonal striping that looks
+# exactly like a panel driven with the wrong timings.
+#
+# That is not hypothetical: it made a working 5 inch panel look broken, and the
+# confirmation step would have reported it as the wrong panel. The 800-wide
+# panels are already 64-byte aligned, which is why this hid for so long.
+STRIDE=$(cat /sys/class/graphics/fb0/stride 2>/dev/null || echo "")
+[ -n "$STRIDE" ] || STRIDE=$(( W * BPP / 8 ))
+[ "$STRIDE" = "$(( W * BPP / 8 ))" ] || \
+    say "  line stride is $STRIDE bytes, not $(( W * BPP / 8 )) - padding honoured"
+
 step "Watch the panel: red, green, blue, white, then colour bars"
-python3 - "$W" "$H" <<'PY'
+python3 - "$W" "$H" "$STRIDE" <<'PY'
 import sys, time
-W, H = int(sys.argv[1]), int(sys.argv[2])
+W, H, STRIDE = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+PAD = b'\x00' * max(0, STRIDE - W * 4)
+
+def paint(row):
+    """One row of W pixels, padded out to the real line stride."""
+    with open('/dev/fb0', 'wb') as f:
+        f.write((row + PAD) * H)
 
 def fill(b, g, r):
-    with open('/dev/fb0', 'wb') as f:
-        f.write(bytes([b, g, r, 255]) * (W * H))
+    paint(bytes([b, g, r, 255]) * W)
 
 for name, c in (("RED", (0, 0, 255)), ("GREEN", (0, 255, 0)),
                 ("BLUE", (255, 0, 0)), ("WHITE", (255, 255, 255))):
@@ -65,8 +84,7 @@ row = b''
 for x in range(W):
     b, g, r = bars[min(x * len(bars) // W, len(bars) - 1)]
     row += bytes([b, g, r, 255])
-with open('/dev/fb0', 'wb') as f:
-    f.write(row * H)
+paint(row)
 print("  -> COLOUR BARS", flush=True)
 PY
 

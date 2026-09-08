@@ -64,8 +64,13 @@ DETECT_NOTE="Goodix GT9271, thresholds 5f/41 - the 10.1 inch reads 50/32"
 # the family and not the panel. These two bytes are the touch and release
 # thresholds from the controller's own config block, and they differ:
 #
+#     5 inch    0x5a 0x3c
 #     8 inch    0x5f 0x41
 #     10.1 inch 0x50 0x32
+#
+# All three differ, so this read does not collide with the 5 inch either - but
+# the product-ID stage above is what makes that safe by construction rather
+# than by luck, which is why both stages are kept.
 #
 # They describe the PANEL, not the overlay. Shown by accident and then on
 # purpose: the 10.1 inch was read while the board still ran the 8 inch overlay,

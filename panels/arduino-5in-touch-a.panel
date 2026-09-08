@@ -53,3 +53,20 @@ DETECT_WRITE="0x81 0x40"          # GT911 product ID register, 16-bit address
 DETECT_READ="4"
 DETECT_EXPECT="0x39 0x31 0x31"    # ASCII "911"
 DETECT_NOTE="Goodix GT911 touch controller reports product ID 911"
+
+# No second probe here, deliberately. The product ID already separates this
+# panel from every other one known - the 8 inch and 10.1 inch both report
+# 9271 - so a second stage would add a way to fail without adding a way to
+# succeed. Thresholds can plausibly vary between production batches, and a
+# stricter fingerprint on a panel that does not need one would eventually
+# reject a genuine 5 inch.
+#
+# Measured anyway, so the comparison is on record rather than assumed
+# (bench/results/goodix/arduino-5in-touch-a.txt):
+#
+#     config version 0x8047     0x46      the 9271 panels read 0x82
+#     resolution     0x8048     720x1280  the 9271 panels are 800x1280
+#     thresholds     0x8053     0x5a 0x3c 8in reads 5f 41, 10.1in reads 50 32
+#
+# Every one of those separates this panel from the other two, so if the
+# product ID ever stops being enough there are three places to go.

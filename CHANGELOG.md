@@ -1,5 +1,44 @@
 # Changelog
 
+## 1.6.1 - 2026-09-09
+
+### Fixed
+
+- **`test-display.sh` sheared its own test pattern on 720-wide panels, and the
+  result looked exactly like a panel driven with the wrong timings.**
+
+  A framebuffer line is `stride` bytes, which is not always `width * bpp/8`. On
+  the 5 inch the kernel pads each line to 2944 bytes where the naive
+  calculation gives 2880, so every row landed 16 pixels further left than the
+  one above - dense diagonal striping across the whole screen.
+
+  It hid because the 800-wide panels are already 64-byte aligned and painted
+  perfectly. Caught the first time the pattern was shown on the 5 inch.
+
+  This mattered more than a cosmetic bug: `45-confirm-display.sh` asks a human
+  whether the pattern looks right, so a working panel would have been reported
+  as the wrong panel, and the suggested fix would have been to install a
+  definition for hardware that was not attached.
+
+### Measured
+
+- The 5 inch config block is now on record
+  (`bench/results/goodix/arduino-5in-touch-a.txt`), closing an unknown the
+  previous release wrote into two panel files. All three panels differ in three
+  independent places:
+
+  | | config version | resolution | thresholds `0x8053` |
+  | --- | --- | --- | --- |
+  | 5 inch | `0x46` | 720x1280 | `5a 3c` |
+  | 8 inch | `0x82` | 800x1280 | `5f 41` |
+  | 10.1 inch | `0x82` | 800x1280 | `50 32` |
+
+  The 5 inch keeps a single-stage fingerprint on purpose. Its product ID `911`
+  already separates it from everything else known, so a second stage would add
+  a way to fail without adding a way to succeed - thresholds can plausibly vary
+  between production batches, and a stricter fingerprint on a panel that does
+  not need one would eventually reject a genuine panel.
+
 ## 1.6.0 - 2026-09-08
 
 ### The 8 inch and 10.1 inch can now be told apart automatically
