@@ -1,5 +1,57 @@
 # Changelog
 
+## 1.5.0 - 2026-09-08
+
+### The 8 inch DSI-TOUCH-A works - and must be chosen by hand
+
+Verified on hardware: connector `card0-DSI-1` at 800x1280, `/dev/fb0`
+800,1280, backlight registered, `Goodix Capacitive TouchScreen` bound, zero DSI
+errors, and the login screen photographed and checked by eye.
+
+It is **indistinguishable from the 10.1 inch on the I2C bus**. Measured on both
+panels, same board:
+
+| | 8 inch | 10.1 inch |
+| --- | --- | --- |
+| Goodix product ID | `9271` | identical |
+| Goodix config version | `0x82` | identical |
+| Goodix touch resolution | 800x1280 | identical |
+| panel driver bound | `jadard-jd9365da` | identical |
+| DRM mode | 800x1280 | identical |
+
+And they are **not interchangeable**. The 8 inch panel on the `10-dsi-touch-a`
+overlay produces a connected connector, the right mode, the right driver, a
+clean `dmesg` - and a garbled picture, vertical banding where the desktop
+should be. The timings differ; the two `.dtbo` files are the same size and
+differ visibly only in a compatible string, so comparing them is misleading.
+
+`detect-panel.sh` therefore matches **both** definitions and refuses to choose,
+printing the two `--select` commands instead. That is the correct outcome, not
+a gap: guessing would give the wrong picture half the time, and every software
+check would still report the display healthy.
+
+### Fixed
+
+- The ambiguous-match message told you to "make DETECT_EXPECT stricter", which
+  is impossible when the panels are genuinely identical on the bus. It is now a
+  chooser: it names the candidates, explains they cannot be told apart, prints
+  the exact commands, and says that a garbled picture means the other one.
+- `.panel` files gained `PANEL_DESC`, so `--list` and the chooser can say
+  "Arduino 8inch DSI-TOUCH-A (800x1280)" rather than only an id.
+- **`40-verify.sh` said "everything checks out" about a garbled screen.** It
+  now says "every check that software can make has passed", and warns that a
+  dark or garbled panel passes all of them. The script's own summary was
+  making the mistake the rest of the repository documents.
+
+### Corrected
+
+An earlier draft of this release claimed the 8 inch and 10.1 inch overlays were
+interchangeable, on the strength of the 8 inch coming up on the 10 inch overlay
+with the connector connected, the mode right and the driver bound. **The screen
+was garbled the whole time.** Checking DRM and calling it working is precisely
+the mistake this repository exists to document, and it was made here on a board
+with a camera pointed at it.
+
 ## 1.4.0 - 2026-09-08
 
 ### Added

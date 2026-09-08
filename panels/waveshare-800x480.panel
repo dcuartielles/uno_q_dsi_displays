@@ -24,6 +24,7 @@
 # WIDTH_MM/HEIGHT_MM below if you care about it.
 
 PANEL_ID="waveshare-800x480"
+PANEL_DESC="Waveshare 800x480 DSI, 4.3in and 5in"
 
 # Compatible string. Reusing RPi's keeps the definition recognisable; it is
 # matched by the descriptor we add to panel-simple, so it only has to be unique.

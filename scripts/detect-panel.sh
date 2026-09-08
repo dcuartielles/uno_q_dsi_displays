@@ -73,7 +73,8 @@ if [ "$ACTION" = list ]; then
         addr=$(panel_field "$p" DETECT_ADDR)
         note=$(panel_field "$p" DETECT_NOTE)
         say ""
-        say "  $C_BLD$id$C_OFF"
+        desc=$(panel_field "$p" PANEL_DESC)
+        say "  $C_BLD$id$C_OFF${desc:+  - $desc}"
         if [ "$stock" = 1 ]; then
             say "    supported by the stock kernel and Arduino overlay"
         else
@@ -239,11 +240,32 @@ case $# in
     ;;
   1) PANEL_FILE=$1 ;;
   *)
+    # Sometimes this is a sloppy fingerprint. Sometimes the panels really are
+    # identical on the bus and only differ in ways I2C cannot see - the 8 inch
+    # and 10.1 inch DSI-TOUCH-A report the same Goodix ID, config version and
+    # touch resolution, yet need different overlays. Guessing there would give
+    # the wrong picture half the time, and every software check would still
+    # report the display healthy. So this asks, rather than choosing.
     say ""
-    warn "more than one panel matched:"
-    for m in "$@"; do say "    $(panel_field "$m" PANEL_ID)"; done
-    die "their fingerprints do not tell them apart. Make DETECT_EXPECT stricter,
-    or choose with --select <id>."
+    step "More than one panel matches"
+    say "  These are indistinguishable on the I2C bus:"
+    say ""
+    for m in "$@"; do
+        _id=$(panel_field "$m" PANEL_ID)
+        _desc=$(panel_field "$m" PANEL_DESC)
+        say "    ${C_BLD}$_id${C_OFF}${_desc:+  - $_desc}"
+    done
+    say ""
+    say "  They are not interchangeable, so the choice has to be yours:"
+    say ""
+    for m in "$@"; do
+        say "    sudo $0 --select $(panel_field "$m" PANEL_ID)"
+    done
+    say ""
+    say "  Pick the one printed on the panel. If the picture comes up garbled -"
+    say "  banding, or content in the wrong place - it is the other one; every"
+    say "  software check passes either way, so trust your eyes over dmesg."
+    exit 3
     ;;
 esac
 

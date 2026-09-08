@@ -19,6 +19,7 @@
 # "Goodix Capacitive TouchScreen" bound.
 
 PANEL_ID="arduino-5in-touch-a"
+PANEL_DESC="Arduino 5inch DSI-TOUCH-A (720x1280)"
 
 # Everything below this line is what makes it different from a panel we have
 # to describe ourselves.

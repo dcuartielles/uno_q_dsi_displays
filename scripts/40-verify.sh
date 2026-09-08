@@ -71,7 +71,15 @@ fi
 
 step "Summary"
 if [ "$FAIL" -eq 0 ]; then
-    ok "everything checks out"
+    ok "every check that software can make has passed"
+    say ""
+    # Deliberately not "everything checks out". Every check above passed on a
+    # board whose screen was showing vertical banding instead of a desktop -
+    # the 8 inch panel driven by the 10.1 inch overlay. Wrong timings give a
+    # connected connector, the right mode, the right driver and a clean dmesg.
+    # The dark-panel bug does the same. Nothing here can see the picture.
+    warn "Software cannot see the picture. A dark or garbled panel passes"
+    warn "every check above. Look at the screen before believing this."
     say ""
     say "Show a test pattern:   sudo ./scripts/test-display.sh"
     say "Test the touchscreen:  sudo ./scripts/test-touch.sh"

@@ -1,0 +1,62 @@
+# Arduino / Waveshare 8inch DSI-TOUCH-A
+#
+# Needs NOTHING from this repository except selecting it. Arduino ships the
+# overlay and the UNO Q kernel has every driver:
+#
+#   jadard,jd9365da-h3        (panel)          ->  jadard-jd9365da
+#   waveshare,dsi-touch-gpio  (backlight/GPIO) ->  gpio-waveshare-dsi
+#   goodix,gt9271             (touch, 0x5d)    ->  goodix_ts
+#
+# Identical to the 10.1 inch on the bus, and NOT interchangeable with it
+# ---------------------------------------------------------------------
+# Measured on both panels, same board, hours apart:
+#
+#   Goodix product ID (0x8140)   0x39 0x32 0x37 0x31   ("9271")   identical
+#   Goodix config version        0x82                             identical
+#   Goodix touch resolution      800 x 1280                       identical
+#   panel driver bound           jadard-jd9365da                  identical
+#   DRM mode                     800x1280                         identical
+#
+# Nothing on the I2C bus distinguishes them. But they need DIFFERENT overlays:
+# this panel on the 10-dsi-touch-a overlay comes up with a connected connector,
+# the right mode, the right driver, a clean dmesg - and a garbled picture,
+# vertical banding where the desktop should be. The timings differ; only the
+# compatible string differs visibly in the .dtbo, so a byte comparison of the
+# two overlays is misleading.
+#
+# That combination - indistinguishable to software, not interchangeable in
+# fact - is why detect-panel.sh matches both definitions and then refuses to
+# choose. Guessing would give the wrong picture half the time, and every
+# software check would still say the display was fine.
+#
+# Verified working 2026-09-08 on an UNO Q + Media Carrier, kernel 7.0.0:
+# connector card0-DSI-1 connected at 800x1280, /dev/fb0 800,1280, backlight
+# registered, Goodix-TS bound at 0x5d, no DSI errors, and the login screen
+# photographed and checked by eye - not taken on DRM's word, which was wrong.
+
+PANEL_ID="arduino-8in-touch-a"
+PANEL_DESC="Arduino 8inch DSI-TOUCH-A (800x1280)"
+
+# Nothing is built, patched or generated for this panel.
+STOCK_SUPPORT=1
+
+CARRIER_DISPLAY_OPTION="8-dsi-touch-a"
+
+STOCK_MODE="800x1280"
+
+# Checked before promising anything: on a kernel too old to know this panel the
+# overlay would load and nothing would bind, which looks exactly like a
+# hardware fault.
+STOCK_DRIVERS="jadard-jd9365da gpio-waveshare-dsi goodix_ts"
+
+TOUCH_ADDR="0x5d"
+
+# --- how detect-panel.sh recognises this panel -----------------------------
+# Shared, deliberately, with panels/arduino-10in-touch-a.panel. Both will
+# match, and detect-panel.sh will say so and ask you to pick - see the note
+# above for why that is the right answer rather than a gap to be closed.
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"                    # GT-series product ID register
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
+DETECT_NOTE="Goodix GT9271 - shared with the 10.1 inch, which needs a different overlay"

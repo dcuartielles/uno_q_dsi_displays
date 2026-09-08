@@ -17,6 +17,7 @@
 # not merely reported by DRM).
 
 PANEL_ID="arduino-10in-touch-a"
+PANEL_DESC="Arduino 10.1inch DSI-TOUCH-A (800x1280)"
 
 # Nothing is built, patched or generated for this panel.
 STOCK_SUPPORT=1
@@ -35,10 +36,23 @@ STOCK_DRIVERS="jadard-jd9365da gpio-waveshare-dsi goodix_ts"
 TOUCH_ADDR="0x5d"
 
 # --- how detect-panel.sh recognises this panel -----------------------------
-# The Goodix reports its model as ASCII, and it is a GT9271 here against the
-# GT911 on the 5 inch - so the two are distinguishable, which is not something
-# to take for granted: they share an address, a driver and a backlight chip,
-# and only these four bytes tell them apart.
+# The Goodix reports its model as ASCII: GT9271 here against GT911 on the
+# 5 inch, which is the only thing separating this panel from that one - they
+# share an address, a driver and a backlight chip.
+#
+# It does NOT separate this panel from the 8 inch. Measured on both, same
+# board: identical product ID, identical config version 0x82, identical touch
+# resolution, identical panel driver, identical DRM mode. Nothing on the bus
+# tells them apart.
+#
+# They are NOT interchangeable, which is the trap. Running the 8 inch on this
+# overlay gives a connected connector, the right mode, the right driver, a
+# clean dmesg - and a garbled screen, because the timings differ. Every
+# software check passes. Only a camera or an eye catches it.
+#
+# So detect-panel.sh deliberately matches BOTH and refuses to choose. That is
+# the correct outcome: guessing here has a 50% chance of a display that looks
+# broken to whoever is standing in front of it.
 #
 # Measured with no matching overlay loaded (the slot still held a definition
 # for completely different hardware), so this works before the board has been
@@ -47,4 +61,4 @@ DETECT_ADDR="0x5d"
 DETECT_WRITE="0x81 0x40"                    # GT-series product ID register
 DETECT_READ="4"
 DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
-DETECT_NOTE="Goodix GT9271 touch controller reports product ID 9271"
+DETECT_NOTE="Goodix GT9271 - shared with the 8 inch, which needs a different overlay"

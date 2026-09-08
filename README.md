@@ -193,7 +193,7 @@ written for people who have never touched I2C — see
 
 ### The panels, and why they need opposite treatment
 
-| | Arduino **5inch-DSI-TOUCH-A** | Arduino **10.1inch-DSI-TOUCH-A** | Waveshare 800x480 (4.3" and 5") |
+| | Arduino **5inch-DSI-TOUCH-A** | Arduino **8inch and 10.1inch DSI-TOUCH-A** | Waveshare 800x480 (4.3" and 5") |
 | --- | --- | --- | --- |
 | panel driver | `panel-himax-hx8394` **stock** | `jadard-jd9365da` **stock** | `panel-simple` **patched** |
 | resolution | 720x1280 portrait | 800x1280 portrait | 800x480 landscape |
@@ -201,11 +201,36 @@ written for people who have never touched I2C — see
 | touch | `goodix_ts` @ 0x5d (GT911) **stock** | `goodix_ts` @ 0x5d (GT9271) **stock** | `edt-ft5x06` @ 0x38 **patched** |
 | what to run | `sudo ./scripts/detect-panel.sh --apply` | same | same |
 
-The two Arduino panels share an address, a touch driver and a backlight chip.
-Only the Goodix product ID separates them - `911` against `9271` - which is
-what `detect-panel.sh` reads. Arduino also ships an **8-dsi-touch-a** overlay;
-that panel is not described here because none has been tested, and a
-fingerprint nobody has measured is worse than none.
+All three Arduino panels share an I2C address, a touch driver and a backlight
+chip. The Goodix product ID separates the 5 inch from the other two - `911`
+against `9271` - and that is what `detect-panel.sh` reads.
+
+**It cannot separate the 8 inch from the 10.1 inch, and nothing else can
+either.** Same product ID, same config version `0x82`, same touch resolution,
+same panel driver, same DRM mode - measured on both panels on the same board.
+
+They are nonetheless **not interchangeable**. Run the 8 inch on the 10 inch
+overlay and you get a connected connector, the right mode, the right driver, a
+clean `dmesg` - and a garbled picture. The timings differ; the two `.dtbo`
+files are the same size and differ visibly only in a compatible string.
+
+So detection matches both and stops, and asks you which one you have:
+
+```
+==> More than one panel matches
+  These are indistinguishable on the I2C bus:
+
+    arduino-8in-touch-a   - Arduino 8inch DSI-TOUCH-A (800x1280)
+    arduino-10in-touch-a  - Arduino 10.1inch DSI-TOUCH-A (800x1280)
+
+  They are not interchangeable, so the choice has to be yours:
+
+    sudo ./scripts/detect-panel.sh --select arduino-8in-touch-a
+```
+
+That is the right outcome rather than a gap to close. Guessing would give the
+wrong picture half the time, and **every software check would still report the
+display healthy** - which is the same trap as the dark panel, in a new place.
 
 The Waveshare entry covers both the 4.3" and the 5" variants with one
 definition. They are the same panel electrically - same timings, same bridge,
