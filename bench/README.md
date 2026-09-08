@@ -59,8 +59,14 @@ one you have is detected rather than declared:
 ```sh
 SHELLY_HOST=192.168.1.50
 SHELLY_CHANNEL=0            # optional, default 0
-SHELLY_AUTH=user:password   # only if the device has a password set
+SHELLY_AUTH=the-password    # only if the device has a password set
 ```
+
+On Gen2+ the username is always `admin` whatever the app displays, so the
+password alone is enough; `user:password` still works if you prefer it
+explicit. Those devices challenge with digest SHA-256, which `urllib` cannot
+do, so it is implemented here - the password is sent only in reply to a
+challenge, never speculatively.
 
 Check it before betting a long run on it:
 

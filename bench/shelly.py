@@ -27,10 +27,17 @@ than configured:
 Everything is local HTTP. No cloud account, and it keeps working when the
 internet does not - which matters, because a run that dies halfway through
 loses every boot the operator already paid for.
+
+If the device has a password set, Gen2+ answers with digest authentication
+(SHA-256, per RFC 7616) rather than the basic scheme, and the username is
+always "admin" regardless of what the app shows. Both are handled; put the
+password in SHELLY_AUTH and it is sent only in response to a challenge, never
+speculatively.
 """
-import base64
+import hashlib
 import json
 import os
+import random
 import sys
 import time
 import urllib.error
@@ -83,21 +90,93 @@ class Shelly(object):
         self._gen = None
 
     # ------------------------------------------------------------- plumbing --
+    @staticmethod
+    def _parse_challenge(header):
+        """Pull the fields out of a WWW-Authenticate line."""
+        fields = {}
+        rest = header.split(None, 1)[1] if " " in header else header
+        for part in rest.split(","):
+            if "=" not in part:
+                continue
+            k, v = part.split("=", 1)
+            fields[k.strip().lower()] = v.strip().strip('"')
+        return fields
+
+    def _digest_header(self, challenge, method, uri):
+        """Build an RFC 7616 digest response.
+
+        Shelly Gen2+ challenges with SHA-256. urllib's own digest handler
+        speaks MD5 and SHA-1 only, so this is done by hand rather than fought
+        with - it is a dozen lines and it fails loudly instead of silently
+        downgrading.
+        """
+        algo = challenge.get("algorithm", "MD5").upper()
+        if algo.startswith("SHA-256") or algo.startswith("SHA256"):
+            h = lambda s: hashlib.sha256(s.encode()).hexdigest()
+        elif algo.startswith("MD5"):
+            h = lambda s: hashlib.md5(s.encode()).hexdigest()
+        else:
+            raise ShellyError(
+                "%s asked for digest algorithm %s, which is not supported"
+                % (self.host, algo))
+
+        user, _, password = self.auth.partition(":")
+        if not password:
+            # Gen2+ has a single fixed account. Accepting a bare password and
+            # filling this in is one less thing to get wrong.
+            user, password = "admin", user
+
+        realm = challenge.get("realm", "")
+        nonce = challenge.get("nonce", "")
+        qop = challenge.get("qop", "auth").split(",")[0].strip()
+        nc = "00000001"
+        cnonce = "%08x" % random.getrandbits(32)
+
+        ha1 = h("%s:%s:%s" % (user, realm, password))
+        ha2 = h("%s:%s" % (method, uri))
+        if qop:
+            resp = h("%s:%s:%s:%s:%s:%s" % (ha1, nonce, nc, cnonce, qop, ha2))
+        else:
+            resp = h("%s:%s:%s" % (ha1, nonce, ha2))
+
+        parts = ['username="%s"' % user, 'realm="%s"' % realm,
+                 'nonce="%s"' % nonce, 'uri="%s"' % uri,
+                 'response="%s"' % resp, "algorithm=%s" % algo]
+        if qop:
+            parts += ["qop=%s" % qop, "nc=%s" % nc, 'cnonce="%s"' % cnonce]
+        if "opaque" in challenge:
+            parts.append('opaque="%s"' % challenge["opaque"])
+        return "Digest " + ", ".join(parts)
+
+    def _open(self, uri, auth_header=None):
+        req = urllib.request.Request("http://%s%s" % (self.host, uri))
+        if auth_header:
+            req.add_header("Authorization", auth_header)
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            return resp.read().decode("utf-8", "replace")
+
     def _get(self, path):
         url = "http://%s%s" % (self.host, path)
-        req = urllib.request.Request(url)
-        if self.auth:
-            token = base64.b64encode(self.auth.encode()).decode()
-            req.add_header("Authorization", "Basic " + token)
         try:
-            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-                body = resp.read().decode("utf-8", "replace")
+            body = self._open(path)
         except urllib.error.HTTPError as e:
-            if e.code == 401:
+            if e.code != 401:
+                raise ShellyError("%s returned HTTP %s" % (url, e.code))
+            # Answer the challenge. The password is only ever sent in reply to
+            # one, so a device with authentication turned off never sees it.
+            if not self.auth:
                 raise ShellyError(
-                    "%s wants a password. Add SHELLY_AUTH=user:password to "
-                    "bench/bench.conf." % self.host)
-            raise ShellyError("%s returned HTTP %s" % (url, e.code))
+                    "%s has a password set. Add SHELLY_AUTH=<password> to "
+                    "bench/bench.conf (the username on Gen2+ is always "
+                    "'admin', so the password alone is enough)." % self.host)
+            challenge = self._parse_challenge(e.headers.get("WWW-Authenticate", ""))
+            try:
+                body = self._open(path, self._digest_header(challenge, "GET", path))
+            except urllib.error.HTTPError as e2:
+                if e2.code == 401:
+                    raise ShellyError(
+                        "%s rejected the password in SHELLY_AUTH." % self.host)
+                raise ShellyError("%s returned HTTP %s" % (url, e2.code))
         except Exception as e:
             raise ShellyError("cannot reach %s (%s)" % (url, e))
         try:
