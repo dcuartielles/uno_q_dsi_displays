@@ -17,12 +17,34 @@ need_root "$@"
 HOLD=0
 for _a in "$@"; do [ "$_a" = "--hold" ] && HOLD=1; done
 
-BACK_VT=7
-PAINT_VT=${PAINT_VT:-3}
-if [ "$HOLD" = 1 ]; then
-    have_cmd chvt && chvt "$PAINT_VT" 2>/dev/null || true
+# Which VT to paint on. NOT one of the first six: systemd's autovt spawns a
+# getty the moment you switch to those, and its login prompt paints straight
+# over the image - the number appears, then a terminal replaces it. tty7 is
+# usually X, so the first genuinely free one is tty8.
+#
+# logind's NAutoVTs decides how many are auto-spawned; read it rather than
+# assume, and stay clear of wherever X actually is.
+PAINT_VT=${PAINT_VT:-}
+if [ -z "$PAINT_VT" ]; then
+    # Consoles 1..6 get a getty from systemd's autovt the moment you switch to
+    # them, and 7 is where X usually sits. Rather than deduce that, check: take
+    # the first console above them with no getty running on it.
+    for _v in 8 9 10 11 12; do
+        [ -c "/dev/tty$_v" ] || continue
+        systemctl is-active "getty@tty$_v.service" >/dev/null 2>&1 && continue
+        PAINT_VT=$_v
+        break
+    done
+    [ -n "$PAINT_VT" ] || PAINT_VT=8
+fi
+
+BACK_VT=$(fgconsole 2>/dev/null || true)
+case "$BACK_VT" in ''|*[!0-9]*) BACK_VT=7 ;; esac
+
+if have_cmd chvt; then
+    chvt "$PAINT_VT" 2>/dev/null || die "could not switch to tty$PAINT_VT"
     sleep 1
-elif have_cmd chvt && have_cmd fgconsole; then
+
     BACK_VT=$(fgconsole 2>/dev/null || echo 7)
     chvt "$PAINT_VT" 2>/dev/null || true
     sleep 1

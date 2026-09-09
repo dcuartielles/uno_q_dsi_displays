@@ -30,3 +30,4 @@ __pycache__/
 *.pyc
 bench/coldboot-debug.log
 tools/.prepare-run.sh
+.panel-batch

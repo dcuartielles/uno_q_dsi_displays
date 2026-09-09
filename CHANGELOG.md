@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.9.0 - 2026-09-09
+
+### Testing a run of panels, one command each
+
+`tools/panel-batch.sh` drives a batch over ADB: detect, install, reboot,
+verify, then paint an **increasing number** on the panel and hold it until
+someone touches the screen.
+
+The number is the point. A colour-bar test looks identical on every panel in a
+batch - including on the one you already tested, if the new panel never came up
+and you are looking at a screen that simply never changed. A number that goes
+up is proof the picture in front of you was drawn for THIS panel, which is what
+makes it worth photographing.
+
+The touch that dismisses it is the touch test, on that physical panel, which is
+a stronger statement than any check here can make from software.
+
+Used on eight Arduino 5inch panels: 8 for 8, about three minutes each, recorded
+in `bench/results/panel-batch.log`.
+
+### Fixed: the test pattern could paint into a console nobody was watching
+
+Three separate faults, all with the same shape - the write succeeds, the screen
+does not change, and nothing is logged:
+
+- **The paint VT had a getty on it.** Switching to tty3 makes systemd's autovt
+  spawn `getty@tty3`, whose login prompt paints straight over the image. The
+  number appeared and was replaced by a terminal seconds later. A free console
+  is now chosen by checking which ones have no getty, rather than hardcoding
+  one.
+- **The VT was derived from `ps` output**, which contained `TERM=vt220` - so it
+  concluded X was on console 220, `chvt 221` failed, and the framebuffer write
+  landed on the console X owns and was discarded. `chvt` failing is now fatal
+  rather than `|| true`.
+- **lightdm takes the console back.** `chvt` returning 0 means the request was
+  accepted, not that it stuck. The frame is now rendered to a file and the wait
+  loop watches the active console, repainting whenever it gets it back, and
+  logging each theft.
+
+That last one produced a recorded PASS for a panel whose number was never
+visible. It was struck from the log and the panel re-tested. A test that can
+record a pass nobody saw is worse than no test, and this repository has now met
+that failure in four different places.
+
+`scripts/test-display.sh` shares the VT logic and is fixed with it.
+
 ## 1.8.0 - 2026-09-09
 
 ### The 12.3 inch DSI-TOUCH-A works

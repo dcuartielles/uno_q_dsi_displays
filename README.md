@@ -480,9 +480,11 @@ scripts/30-install-overlay.sh generate, compile and enable the overlay
 scripts/35-install-recovery.sh boot-recovery service for flaky-I2C boots
 scripts/40-verify.sh          post-reboot checks
 scripts/45-confirm-display.sh show a pattern and ask whether it looks right
+scripts/show-number.sh        paint a big number, optionally until touched
 scripts/test-display.sh       colour bars on the panel
 scripts/test-touch.sh         report touch events
 tools/goodix-config.sh        dump and diff a touch controller's config
+tools/panel-batch.sh          test a run of panels, one command each
 tools/                        generators and kernel-source patchers
 bench/                        reliability benchmark (camera + cold boots)
 docs/                         adding a panel, how it works, troubleshooting
