@@ -31,3 +31,9 @@ __pycache__/
 bench/coldboot-debug.log
 tools/.prepare-run.sh
 .panel-batch
+
+# Pitch and business documents. Not part of the driver work, and iterations of
+# a Word file would churn the history for no benefit. Covers every revision
+# (_v001, _v002, ...) and the script that generates them.
+pitch/
+*_v[0-9][0-9][0-9].docx
