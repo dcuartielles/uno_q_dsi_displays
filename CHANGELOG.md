@@ -79,6 +79,13 @@ It is also the right shape for a round panel: bounded by the inscribed circle,
 so nothing is lost to the bezel, and rotationally symmetric, so shear, a wrong
 stride or a wrong mode show up at once as an oval.
 
+That settled an open question on this panel. Arduino's built-in jadard driver
+and the upstream one disagree about its pixel clock - about 51.8 MHz against
+36.5 MHz - and there was no way to tell from a still pattern which was right,
+because the corners that would have shown it are not on the glass. The spiral
+rendered **circular** on the upstream mode, which it cannot do if the two axes
+are scaled differently.
+
 The animation is rendered up front as a ring of complete frames and played back
 one buffer per frame - about 40 MB of memory and a few seconds of rendering,
 in exchange for a frame rate that actually looks like motion on this SoC.

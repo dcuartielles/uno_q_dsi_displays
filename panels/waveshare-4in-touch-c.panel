@@ -43,8 +43,12 @@
 # (unoq,4-0-dsi-touch-c) that nothing built in can match.
 #
 # The two drivers do not agree on timings for this panel - jadard runs it near
-# 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is what was
-# verified here.
+# 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is the one used
+# here, and its geometry is CONFIRMED: scripts/show-spiral.sh rendered a
+# circular spiral, read by eye off the glass. That is the check the corners of
+# this panel cannot give you - a circle drawn with square pixels comes out an
+# oval the moment the pixel clock or the stride is wrong, so a spiral that
+# looks round says the horizontal and vertical scales agree.
 #
 # The threshold pair is what separates it. Note how close it runs to the 12.3
 # inch: the first byte is identical and only the second differs, which is why

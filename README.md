@@ -317,7 +317,8 @@ match, so they can only ever bind to each other.
 
 The two drivers also disagree about this panel's pixel clock - jadard runs it
 near 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is what is
-verified here.
+verified here, and the spiral below is how: it came out **circular**, which it
+cannot do if the two axes are scaled differently.
 
 ### Checking a round panel
 
