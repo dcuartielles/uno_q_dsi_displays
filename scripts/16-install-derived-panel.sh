@@ -65,12 +65,20 @@ fi
 cp "$BUILD/$DRV_SRC.pristine" "$BUILD/$DRV_SRC"
 ok "$DRV_SRC"
 
+# The string the driver and the overlay will both use. Private on purpose:
+# Arduino's built-in jadard driver claims several upstream Waveshare
+# compatibles, and when it wins the race it inherits an overlay written for a
+# different driver - which is how the 4.0 inch came up connected, at the right
+# mode, and completely dark.
+INSTALLED_COMPATIBLE="unoq,$(printf '%s' "${PANEL_DT_COMPATIBLE#*,}" \
+    | tr 'A-Z' 'a-z' | tr -c 'a-z0-9' '-' | sed 's/-\{1,\}/-/g; s/^-//; s/-$//')"
+
 step "Trimming it to this panel"
 # Not cosmetic. The upstream driver matches seventeen compatible strings and
 # three of them are panels this board already supports with built-in drivers.
 # A module claiming those could bind first and hand a working panel another
 # panel's initialisation sequence.
-python3 "$HERE/$DRIVER_PATCHER" "$BUILD/$DRV_SRC"
+PANEL_DT_COMPATIBLE="$PANEL_DT_COMPATIBLE" PANEL_DT_COMPATIBLE_OUT="$INSTALLED_COMPATIBLE" python3 "$HERE/$DRIVER_PATCHER" "$BUILD/$DRV_SRC"
 
 step "Building"
 DRV_OBJ=${DRV_SRC%.c}
@@ -94,7 +102,7 @@ SLOT=$(slot_dtbo_for "$CARRIER_DISPLAY_OPTION") \
 
 dtc -I dtb -O dts "$TEMPLATE" -o "$BUILD/panel.dts" 2>/dev/null
 
-PANEL_DT_COMPATIBLE="$PANEL_DT_COMPATIBLE" \
+PANEL_DT_COMPATIBLE="$INSTALLED_COMPATIBLE" \
 RESET_GPIO_LINE="${RESET_GPIO_LINE:-1}" \
 IOVCC_GPIO_LINE="${IOVCC_GPIO_LINE:-4}" \
 AVDD_GPIO_LINE="${AVDD_GPIO_LINE:-0}" \

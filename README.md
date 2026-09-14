@@ -274,6 +274,75 @@ controller at 0x38, none of which are on that hardware. Selecting the official
 panel restores Arduino's overlay automatically and keeps the displaced one
 alongside it.
 
+### Panels the kernel has never heard of
+
+Two panels here are neither *stock* nor *described*: the **Arduino 12.3inch
+DSI-TOUCH-A** and the **Waveshare 4.0inch DSI-TOUCH-C**. The UNO Q kernel has
+no mode for either and Arduino ships no overlay, so they cannot be selected -
+and they cannot be described either, because the generator in this repository
+emits Raspberry Pi style hardware (an ATTINY at 0x45, an `edt-ft5x06` at 0x38)
+and these panels have a Waveshare GPIO chip and a Goodix.
+
+What they do have is a driver upstream. Raspberry Pi's tree carries the mode,
+the DSI parameters and the vendor initialisation sequence for seventeen
+Waveshare panels, and that driver compiles against the Arduino kernel
+unmodified. So `scripts/16-install-derived-panel.sh` fetches it, trims it to
+the one panel, builds it, and derives an overlay from Arduino's own 10.1 inch
+one:
+
+```bash
+sudo ./scripts/16-install-derived-panel.sh panels/waveshare-4in-touch-c.panel
+```
+
+Adding a third such panel usually means writing a `.panel` file and nothing
+else. `tools/patch-waveshare-panel.py` reads the driver structure rather than
+naming symbols, so the compatible string is enough to find everything that
+belongs to a panel:
+
+```
+of_match_table  compatible -> descriptor
+descriptor      .init      -> initialisation sequence
+descriptor      .mode      -> display mode
+```
+
+**The installed compatible is deliberately not the upstream one.** Arduino's
+built-in `jadard-jd9365da` also claims `waveshare,4.0-dsi-touch-c`, and on the
+first attempt it won the race - then looked for the `vccio-supply` and
+`vdd-supply` regulators that the derived overlay had just replaced with GPIOs
+for the upstream driver. The rails never came up. The panel was dark with a
+connected connector, the right mode, and a clean `dmesg`: the exact failure
+this repository keeps meeting. The trimmed module and the generated overlay now
+share a private string (`unoq,4-0-dsi-touch-c`) that nothing built in can
+match, so they can only ever bind to each other.
+
+The two drivers also disagree about this panel's pixel clock - jadard runs it
+near 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is what is
+verified here.
+
+### Checking a round panel
+
+The 4.0 inch C is **round**: a 720x720 framebuffer on a circle of glass, so the
+four corners are not physically there. That breaks the usual check. A colour
+bar pattern loses its corners to the bezel, and from a photograph there is no
+way to tell whether the glass cut them off or the mode did.
+
+```bash
+sudo ./scripts/show-spiral.sh --until-touch
+```
+
+spins a spiral in the middle of the screen until someone touches it. It is
+bounded by the inscribed circle, so it is entirely visible on a round panel and
+on a square one, and being rotationally symmetric it turns shear, a wrong
+stride or a wrong mode into an obvious oval.
+
+Motion is the other half of it. A still image proves a frame was painted; it
+cannot prove the panel is still being refreshed, because a framebuffer written
+once and then frozen photographs exactly like one being driven perfectly. If
+the spiral turns, the pipeline is running end to end right now. The whole
+animation is rendered up front as a ring of complete frames and played back by
+writing one buffer per frame, which is what makes that possible in Python on
+this SoC.
+
 ---
 
 ## Preparing several boards over USB

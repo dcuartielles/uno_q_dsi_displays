@@ -1,5 +1,88 @@
 # Changelog
 
+## 1.10.0 - 2026-09-15
+
+### The Waveshare 4.0inch DSI-TOUCH-C works, and it is round
+
+The sixth panel definition here - seventh physical panel, since the Waveshare
+800x480 entry covers both a 4.3in and a 5in - and the second to come in through
+the *derived* path: an upstream driver trimmed to one panel, plus an overlay
+derived from Arduino's 10.1 inch one. Verified on hardware: connector `card0-DSI-1` at 720x720, the
+trimmed `ws-4-0-dsi-touch-c` driver bound, a number painted on the glass and
+read by eye, a spiral animated on it at 12 fps, and Goodix touch working.
+
+```bash
+sudo ./scripts/16-install-derived-panel.sh panels/waveshare-4in-touch-c.panel
+```
+
+Recognised automatically by `detect-panel.sh`. It shares the GT9271 product ID
+with the 8, 10.1 and 12.3 inch panels, so the touch thresholds at `0x8053`
+separate it - `64 46` here against `64 32` on the 12.3 inch. Only the second
+byte differs, which is why both are read and why the product ID stage stays in
+front of it.
+
+**The glass is round.** The framebuffer is a 720x720 square but the panel is a
+circle inscribed in it and the corners are not physically there. Touch
+orientation is recorded as unverified: on a square panel the axes cannot be
+told apart by their reported extents the way they can on a tall one.
+
+### Fixed: a built-in driver could steal a derived panel and leave it dark
+
+The first install of the 4.0 inch came up connected, at the right mode, with a
+clean `dmesg`, and completely dark.
+
+Arduino's built-in `jadard-jd9365da` also claims `waveshare,4.0-dsi-touch-c`.
+It registered at boot and won the race, then went looking for the
+`vccio-supply` and `vdd-supply` regulators - which `derive-overlay.py` had just
+replaced with GPIOs, because the upstream driver sequences those lines itself.
+The rails never came up.
+
+Nothing had ever guaranteed that the driver we built was the one that binds.
+Now the trimmed module and the generated overlay share a compatible string that
+is private to this repository:
+
+```
+upstream, used to find the entry   waveshare,4.0-dsi-touch-c
+installed in driver and overlay    unoq,4-0-dsi-touch-c
+```
+
+They can only ever match each other, so whatever the kernel has built in
+becomes irrelevant rather than a race.
+
+### The Waveshare patcher works for any of the seventeen panels
+
+`tools/patch-waveshare-12in.py` named the three symbols belonging to its one
+panel, which works exactly once. It is now
+`tools/patch-waveshare-panel.py`, and it derives them from the compatible
+string by reading the driver's own structure:
+
+```
+of_match_table  compatible -> descriptor
+descriptor      .init      -> initialisation sequence
+descriptor      .mode      -> display mode
+```
+
+Adding another Waveshare panel from that driver should now need a `.panel` file
+and nothing else.
+
+### A moving test pattern
+
+`scripts/show-spiral.sh` spins a spiral in the centre of the screen, with
+`--until-touch` and `--seconds` like `show-number.sh`.
+
+It answers something the still patterns cannot. A framebuffer that was written
+once and then froze photographs exactly like one being driven perfectly, so a
+still image proves a frame was painted but not that the panel is still being
+refreshed. If the spiral turns, the pipeline is running end to end.
+
+It is also the right shape for a round panel: bounded by the inscribed circle,
+so nothing is lost to the bezel, and rotationally symmetric, so shear, a wrong
+stride or a wrong mode show up at once as an oval.
+
+The animation is rendered up front as a ring of complete frames and played back
+one buffer per frame - about 40 MB of memory and a few seconds of rendering,
+in exchange for a frame rate that actually looks like motion on this SoC.
+
 ## 1.9.0 - 2026-09-09
 
 ### Testing a run of panels, one command each

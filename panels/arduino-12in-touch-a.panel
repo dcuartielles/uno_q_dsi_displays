@@ -50,7 +50,7 @@ STOCK_MODE="720x1920"
 # commit so a kernel bump does not strand it; the patcher fails loudly if the
 # file is ever restructured.
 DRIVER_URL="https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c"
-DRIVER_PATCHER="tools/patch-waveshare-12in.py"
+DRIVER_PATCHER="tools/patch-waveshare-panel.py"
 
 # The compatible the trimmed driver answers to - and the only one it claims,
 # which matters: untrimmed it also claims the 5, 8 and 10.1 inch panels that

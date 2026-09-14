@@ -1,0 +1,110 @@
+# Waveshare 4.0inch DSI-TOUCH-C
+#
+# A derived panel, like the 12.3 inch: the UNO Q kernel has no mode for it and
+# Arduino ships no overlay, but Raspberry Pi's tree carries the mode, the DSI
+# parameters and the vendor initialisation sequence.
+# scripts/16-install-derived-panel.sh fetches that driver, trims it to this
+# panel alone, builds it, and derives an overlay from Arduino's 10.1 inch one.
+#
+# 720x720, and only TWO DSI lanes where the 12.3 inch uses four - which is the
+# reason the lane count is read from the driver rather than assumed anywhere in
+# this repository.
+#
+# THE GLASS IS ROUND. The framebuffer is a 720x720 square but the panel is a
+# circle inscribed in it, so the four corners are not physically there. That
+# has consequences for anything used to check this panel by eye:
+#
+#   - a test pattern with content near the corners loses it to the bezel, and
+#     from a photograph there is no telling whether the glass cut it off or the
+#     mode did;
+#   - scripts/show-number.sh scales a digit to about 70% of the screen, which
+#     stays inside the circle and is still readable here;
+#   - scripts/show-spiral.sh was written for this panel - it keeps everything
+#     inside the inscribed circle, and being rotationally symmetric it turns
+#     any shear or wrong stride into a visible oval.
+#
+# Fingerprint measured on the panel itself:
+#
+#     Goodix product ID   9271        shared with the 8, 10.1 and 12.3 inch
+#     config version      0x82        shared with the 8 and 10.1 inch
+#     touch resolution    720 x 720   unique so far
+#     thresholds 0x8053   0x64 0x46   unique - the 12.3 inch reads 0x64 0x32
+#
+# Verified working 2026-09-15 on an UNO Q + Media Carrier, kernel 7.0.0:
+# connector card0-DSI-1 at 720x720, driver ws-4-0-dsi-touch-c bound, a test
+# number rendered on the glass and read by eye, a spiral animated on it at 12
+# frames per second, and Goodix touch present.
+#
+# WATCH OUT: Arduino's built-in jadard-jd9365da ALSO claims
+# waveshare,4.0-dsi-touch-c, and on the first attempt it won the race and left
+# the panel dark - it wants vccio-supply/vdd-supply regulators, which the
+# derived overlay had just replaced with GPIOs for the upstream driver. That is
+# why derived panels are installed under a private compatible string
+# (unoq,4-0-dsi-touch-c) that nothing built in can match.
+#
+# The two drivers do not agree on timings for this panel - jadard runs it near
+# 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is what was
+# verified here.
+#
+# The threshold pair is what separates it. Note how close it runs to the 12.3
+# inch: the first byte is identical and only the second differs, which is why
+# both bytes are read and why the product ID stage is kept in front of it.
+
+PANEL_ID="waveshare-4in-touch-c"
+PANEL_DESC="Waveshare 4.0inch DSI-TOUCH-C (720x720)"
+
+DERIVED_PANEL=1
+STOCK_MODE="720x720"
+
+# --- the driver ------------------------------------------------------------
+DRIVER_URL="https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c"
+DRIVER_PATCHER="tools/patch-waveshare-panel.py"
+
+# The patcher finds this entry in the driver's match table and keeps only the
+# descriptor, mode and initialisation sequence it points at - everything else
+# is removed, including the three compatibles this board already drives with
+# built-in drivers.
+PANEL_DT_COMPATIBLE="waveshare,4.0-dsi-touch-c"
+
+# --- the overlay -----------------------------------------------------------
+# Arduino's 10.1 inch overlay describes this carrier correctly; only the panel
+# node changes. Installed into the 5 inch slot because arduino-linux-config
+# hardcodes its display options and cannot register a new one.
+OVERLAY_TEMPLATE_OPTION="10-dsi-touch-a"
+CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
+
+# GPIO lines on the panel's own controller at 0x45. Line numbers are Arduino's;
+# the polarity is Raspberry Pi's, because this driver sequences these itself
+# and Arduino's ACTIVE_LOW reset would invert its pulse and hold the panel in
+# reset - a dark screen with nothing wrong in dmesg.
+RESET_GPIO_LINE=1
+IOVCC_GPIO_LINE=4
+AVDD_GPIO_LINE=0
+
+# --- touch -----------------------------------------------------------------
+# The display is verified; the touch ORIENTATION is not. On a square 720x720
+# panel the axes cannot be distinguished by range the way they can on a tall
+# one, so there is nothing to deduce from the reported extents - it has to be
+# tried by hand.
+# Raspberry Pi's overlay sets no orientation properties for this variant, so
+# none are set here; if touch comes out mirrored or transposed, set
+# TOUCH_SWAP_XY / TOUCH_INVERT_X / TOUCH_INVERT_Y and reinstall.
+TOUCH_ADDR="0x5d"
+TOUCH_SWAP_XY=0
+TOUCH_INVERT_X=0
+TOUCH_INVERT_Y=0
+
+# goodix_ts also needs its reads split for the CCI bus, which refuses anything
+# over 12 bytes - scripts/17-install-goodix-fix.sh, run automatically.
+STOCK_DRIVERS="goodix_ts"
+
+# --- how detect-panel.sh recognises it -------------------------------------
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
+DETECT_NOTE="Goodix GT9271, thresholds 64/46 - the 4.0 inch C (720x720 panel)"
+
+DETECT2_WRITE="0x80 0x53"
+DETECT2_READ="2"
+DETECT2_EXPECT="0x64 0x46"
