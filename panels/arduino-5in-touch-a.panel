@@ -54,19 +54,29 @@ DETECT_READ="4"
 DETECT_EXPECT="0x39 0x31 0x31"    # ASCII "911"
 DETECT_NOTE="Goodix GT911 touch controller reports product ID 911"
 
-# No second probe here, deliberately. The product ID already separates this
-# panel from every other one known - the 8 inch and 10.1 inch both report
-# 9271 - so a second stage would add a way to fail without adding a way to
-# succeed. Thresholds can plausibly vary between production batches, and a
-# stricter fingerprint on a panel that does not need one would eventually
-# reject a genuine 5 inch.
+# This panel carried no second probe for a long time, deliberately: "911"
+# separated it from every other panel known - the 8, 10.1 and 12.3 inch all
+# report 9271 - so a second stage could only add ways to fail.
 #
-# Measured anyway, so the comparison is on record rather than assumed
-# (bench/results/goodix/arduino-5in-touch-a.txt):
+# The Waveshare 7.0inch DSI-TOUCH-C ended that. It answers 911 as well, and
+# before this stage existed it was detected, with full confidence, as an
+# Arduino 5 inch. The comment above it used to say the product ID "already
+# separates this panel from every other one known", which is a good reminder
+# that a fingerprint is only unique across the panels you have seen.
 #
-#     config version 0x8047     0x46      the 9271 panels read 0x82
-#     resolution     0x8048     720x1280  the 9271 panels are 800x1280
-#     thresholds     0x8053     0x5a 0x3c 8in reads 5f 41, 10.1in reads 50 32
+# The measurements were on record either way, which is what made the fix five
+# minutes' work (bench/results/goodix/arduino-5in-touch-a.txt):
 #
-# Every one of those separates this panel from the other two, so if the
-# product ID ever stops being enough there are three places to go.
+#     config version 0x8047     0x46      9271 panels read 0x82, the 7in 0x5b
+#     resolution     0x8048     720x1280  the 7in C is 1024x600
+#     thresholds     0x8053     0x5a 0x3c 8in 5f 41, 10.1in 50 32, 7in 64 46
+#
+# Touch resolution is the one used. A digitizer's reported size is a property
+# of the glass; thresholds are tuning and can plausibly move between
+# production batches, so a fingerprint built on those would eventually reject
+# a genuine panel.
+
+# Touch resolution, little-endian: 0x02d0 = 720 across, 0x0500 = 1280 down.
+DETECT2_WRITE="0x80 0x48"
+DETECT2_READ="4"
+DETECT2_EXPECT="0xd0 0x02 0x00 0x05"

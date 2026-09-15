@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.11.0 - 2026-09-15
+
+### The Waveshare 7.0inch DSI-TOUCH-C works
+
+Seventh panel definition, third down the *derived* path, and the **first
+landscape panel** here - every other one is portrait. Verified on hardware:
+connector `card0-DSI-1` at 1024x600, the trimmed `ws-7-0-dsi-touch-c` driver
+bound to `5e94000.dsi.0` and the only mipi-dsi driver registered, a spiral
+animated on the glass, and touch confirmed by a finger.
+
+```bash
+sudo ./scripts/detect-panel.sh --apply
+```
+
+It needed **no code** - a `.panel` file and nothing else, which is what the
+derived path was rebuilt for in 1.10.0. Worth noting it exercised that
+rebuild: upstream the descriptor is `ws_panel_7_inch_c_desc` while its mode is
+`ws_panel_7_c_mode`, so a patcher guessing symbol names would have needed hand
+editing here.
+
+### Fixed: a 7 inch panel was detected as an Arduino 5 inch
+
+This one reports Goodix product ID **`911`** - the same as the Arduino 5 inch.
+Plugged in before this release, `detect-panel.sh` identified it as an Arduino 5
+inch with complete confidence and offered to install that overlay.
+
+The 5 inch definition carried no second probe **on purpose**, and said so:
+
+> No second probe here, deliberately. The product ID already separates this
+> panel from every other one known [...] so a second stage would add a way to
+> fail without adding a way to succeed.
+
+That was true when it was written and is a fair reminder that a fingerprint is
+only unique across the panels you have seen. Both definitions now read the
+**touch resolution** from the Goodix config block at `0x8048` as a second
+stage - 720x1280 for the 5 inch, 1024x600 for the 7 inch:
+
+```
+arduino-5in-touch-a: 0x5d matched, second probe replied 0x00 0x04 0x58 0x02,
+                     wanted 0xd0 0x02 0x00 0x05
+ok  waveshare-7in-touch-c: 0x5d replied 0x39 0x31 0x31 0x00,
+                           then 0x00 0x04 0x58 0x02
+```
+
+Resolution was chosen over the threshold bytes, which also differ. A
+digitizer's reported size is a property of the glass; thresholds are tuning
+that can plausibly move between production batches, and a fingerprint built on
+those would eventually reject a genuine panel.
+
+Both values are measured rather than derived - the 5 inch's came from
+`bench/results/goodix/arduino-5in-touch-a.txt`, recorded back when it was
+written down only so the comparison was on record. That is the whole reason
+this was a five-minute fix instead of a hunt for a 5 inch panel to re-measure.
+The 7 inch's dump is now alongside it.
+
+The resolution is also corroborated from the other side: the upstream driver's
+mode for `waveshare,7.0-dsi-touch-c` is 1024x600, which is what the touch
+controller says its digitizer is. Two independent sources, one answer.
+
 ## 1.10.0 - 2026-09-15
 
 ### The Waveshare 4.0inch DSI-TOUCH-C works, and it is round

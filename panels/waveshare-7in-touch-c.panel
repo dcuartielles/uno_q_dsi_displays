@@ -1,0 +1,93 @@
+# Waveshare 7.0inch DSI-TOUCH-C
+#
+# A derived panel, like the 12.3 inch and the 4.0 inch: the UNO Q kernel has no
+# mode for it and Arduino ships no overlay, but Raspberry Pi's tree carries the
+# mode, the DSI parameters and the vendor initialisation sequence.
+# scripts/16-install-derived-panel.sh fetches that driver, trims it to this
+# panel alone, builds it, and derives an overlay from Arduino's 10.1 inch one.
+#
+# 1024x600 landscape on TWO DSI lanes, RGB888, 51.7 MHz - the first landscape
+# panel supported here. Every other one is portrait.
+#
+# Fingerprint measured on the panel itself:
+#
+#     Goodix product ID   911         SHARED WITH THE ARDUINO 5 INCH
+#     config version      0x5b        the 5 inch reads 0x46
+#     touch resolution    1024 x 600  the 5 inch is 720 x 1280
+#     thresholds 0x8053   0x64 0x46   the 5 inch reads 0x5a 0x3c
+#
+# THE PRODUCT ID IS NOT ENOUGH FOR THIS ONE. Until this panel arrived, "911"
+# meant the Arduino 5 inch and nothing else, and that panel carried no second
+# probe on purpose. It does now, because this one answers 911 as well - plugged
+# in before that changed, detection confidently reported an Arduino 5 inch.
+#
+# The two are separated on TOUCH RESOLUTION, read from the Goodix config block
+# at 0x8048 as four little-endian bytes. Resolution was chosen over the
+# thresholds deliberately: a digitizer's reported size is a property of the
+# glass, while thresholds are tuning and can plausibly move between production
+# batches. Both panels' values are measured, not derived -
+# bench/results/goodix/.
+#
+# It is also corroborated from the other side: the upstream driver's mode for
+# waveshare,7.0-dsi-touch-c is 1024x600, which is what the touch controller
+# says the digitizer is. Two independent sources, one answer.
+
+PANEL_ID="waveshare-7in-touch-c"
+PANEL_DESC="Waveshare 7.0inch DSI-TOUCH-C (1024x600)"
+
+DERIVED_PANEL=1
+STOCK_MODE="1024x600"
+
+# --- the driver ------------------------------------------------------------
+DRIVER_URL="https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c"
+DRIVER_PATCHER="tools/patch-waveshare-panel.py"
+
+# The patcher finds this entry in the driver's match table and keeps only the
+# descriptor, mode and initialisation sequence it points at. Worth noting that
+# the descriptor is ws_panel_7_inch_c_desc while its mode is ws_panel_7_c_mode
+# - the names do not follow one pattern upstream, which is exactly why the
+# patcher reads the descriptor rather than guessing symbol names.
+PANEL_DT_COMPATIBLE="waveshare,7.0-dsi-touch-c"
+
+# --- the overlay -----------------------------------------------------------
+# Arduino's 10.1 inch overlay describes this carrier correctly; only the panel
+# node changes. Installed into the 5 inch slot because arduino-linux-config
+# hardcodes its display options and cannot register a new one.
+OVERLAY_TEMPLATE_OPTION="10-dsi-touch-a"
+CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
+
+# GPIO lines on the panel's own controller at 0x45. Line numbers are Arduino's;
+# the polarity is Raspberry Pi's, because this driver sequences these itself
+# and Arduino's ACTIVE_LOW reset would invert its pulse and hold the panel in
+# reset - a dark screen with nothing wrong in dmesg.
+RESET_GPIO_LINE=1
+IOVCC_GPIO_LINE=4
+AVDD_GPIO_LINE=0
+
+# --- touch -----------------------------------------------------------------
+# No transform. The digitizer reports X across 0..1024 and Y across 0..600, and
+# the framebuffer is 1024x600 - the axes already agree, unlike the 12.3 inch
+# where touch runs 1920 across a 720-wide framebuffer and has to be transposed.
+#
+# That is a deduction from the reported extents, which is sound here because
+# the panel is not square, but it is still worth a finger before trusting it.
+TOUCH_ADDR="0x5d"
+TOUCH_SWAP_XY=0
+TOUCH_INVERT_X=0
+TOUCH_INVERT_Y=0
+
+# goodix_ts also needs its reads split for the CCI bus, which refuses anything
+# over 12 bytes - scripts/17-install-goodix-fix.sh, run automatically.
+STOCK_DRIVERS="goodix_ts"
+
+# --- how detect-panel.sh recognises it -------------------------------------
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x31 0x31"              # ASCII "911"
+DETECT_NOTE="Goodix GT911 reporting a 1024x600 digitizer - the 7.0 inch C"
+
+# Touch resolution, little-endian: 0x0400 = 1024 across, 0x0258 = 600 down.
+DETECT2_WRITE="0x80 0x48"
+DETECT2_READ="4"
+DETECT2_EXPECT="0x00 0x04 0x58 0x02"

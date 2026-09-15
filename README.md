@@ -202,8 +202,18 @@ written for people who have never touched I2C — see
 | what to run | `sudo ./scripts/detect-panel.sh --apply` | same | same |
 
 All three Arduino panels share an I2C address, a touch driver and a backlight
-chip. The Goodix product ID separates the 5 inch from the other two - `911`
-against `9271` - and that is what `detect-panel.sh` reads.
+chip. The Goodix product ID sorts them into families - `911` against `9271` -
+and that is the first thing `detect-panel.sh` reads.
+
+**A product ID is only unique across the panels you have seen.** For a long
+time `911` meant the Arduino 5 inch and nothing else, so that definition
+carried no second probe on purpose: a second stage could only add ways to
+fail. Then the Waveshare 7.0inch DSI-TOUCH-C arrived, answered `911`, and was
+detected as an Arduino 5 inch with complete confidence. Both definitions now
+check the **touch resolution** at `0x8048` as well - 720x1280 against
+1024x600. Resolution rather than the threshold bytes, because a digitizer's
+reported size is a property of the glass while thresholds are tuning that can
+plausibly move between production batches.
 
 **It cannot separate the 8 inch from the 10.1 inch, and nothing else can
 either.** Same product ID, same config version `0x82`, same touch resolution,
@@ -276,10 +286,11 @@ alongside it.
 
 ### Panels the kernel has never heard of
 
-Two panels here are neither *stock* nor *described*: the **Arduino 12.3inch
-DSI-TOUCH-A** and the **Waveshare 4.0inch DSI-TOUCH-C**. The UNO Q kernel has
-no mode for either and Arduino ships no overlay, so they cannot be selected -
-and they cannot be described either, because the generator in this repository
+Three panels here are neither *stock* nor *described*: the **Arduino 12.3inch
+DSI-TOUCH-A**, the **Waveshare 4.0inch DSI-TOUCH-C** and the **Waveshare
+7.0inch DSI-TOUCH-C**. The UNO Q kernel has no mode for any of them and
+Arduino ships no overlay, so they cannot be selected - and they cannot be
+described either, because the generator in this repository
 emits Raspberry Pi style hardware (an ATTINY at 0x45, an `edt-ft5x06` at 0x38)
 and these panels have a Waveshare GPIO chip and a Goodix.
 
@@ -294,16 +305,22 @@ one:
 sudo ./scripts/16-install-derived-panel.sh panels/waveshare-4in-touch-c.panel
 ```
 
-Adding a third such panel usually means writing a `.panel` file and nothing
-else. `tools/patch-waveshare-panel.py` reads the driver structure rather than
-naming symbols, so the compatible string is enough to find everything that
-belongs to a panel:
+Adding another such panel usually means writing a `.panel` file and nothing
+else - the 7.0 inch C needed exactly that and no code at all.
+`tools/patch-waveshare-panel.py` reads the driver structure rather than naming
+symbols, so the compatible string is enough to find everything that belongs to
+a panel:
 
 ```
 of_match_table  compatible -> descriptor
 descriptor      .init      -> initialisation sequence
 descriptor      .mode      -> display mode
 ```
+
+That indirection is not decoration. Upstream the 7.0 inch C descriptor is
+`ws_panel_7_inch_c_desc` while its mode is `ws_panel_7_c_mode` - the names do
+not follow one pattern, so anything guessing symbol names would have needed
+hand-editing for this panel.
 
 **The installed compatible is deliberately not the upstream one.** Arduino's
 built-in `jadard-jd9365da` also claims `waveshare,4.0-dsi-touch-c`, and on the
