@@ -1,5 +1,70 @@
 # Changelog
 
+## 1.12.0 - 2026-09-15
+
+### A tunnel, for panels that are not round
+
+`scripts/show-tunnel.sh` drives into a tunnel of concentric rectangles.
+
+The spiral was written for the round 4.0 inch and is bounded by the inscribed
+circle, which leaves most of a landscape panel unused. The tunnel fills the
+screen to all four edges, so it exercises the corners - where a wrong mode
+shows itself first.
+
+```bash
+sudo ./scripts/show-tunnel.sh --until-touch
+```
+
+The vanishing point sways from side to side while the nearest rectangle stays
+put - each rectangle is displaced by `sway * (1 - scale)` - which reads as
+driving through a curving tunnel rather than as the whole image sliding about.
+The rectangles provably cannot collide: the gap between neighbours is
+`(s_k - s_k+1) * (halfwidth +/- sway)`, positive for any sway under half the
+screen width. It is not tuning that keeps them apart.
+
+The colours fade around the **hue circle** through red, green, yellow and blue.
+The first attempt interpolated in RGB, where yellow to blue passes through
+`(152,170,152)` - a washed out grey-green that read on screen as a white
+rectangle sitting in the middle of a saturated cycle. Yellow to blue is a dead
+heat at 180 degrees either way, and that tie is settled forwards deliberately,
+through green and cyan rather than back through red, which the cycle already
+starts on.
+
+### The moving patterns now share their machinery
+
+Three copies of the same subtle code were about to exist, so there are now two
+shared pieces instead:
+
+- **`lib/paint.sh`** - framebuffer geometry and taking a console. That logic
+  has a history of failing in the one way that is hardest to see: the write
+  succeeds, the screen does not change, and nothing is logged. A getty on the
+  paint VT, a VT number parsed out of `TERM=vt220`, lightdm stealing the
+  console mid-photograph - three separate faults, all with that shape. One copy
+  of that reasoning is enough.
+- **`tools/fbpaint.py`** - the playback loop, what counts as a touchscreen
+  (matched on the `ABS_MT_POSITION_X` capability rather than a driver name),
+  and recovering the console when something takes it back.
+
+The tunnel gains the console-steal recovery it did not have; the spiral gains
+the memory-aware ring sizing the tunnel had.
+
+### Fixed: --until-touch did nothing on the tunnel
+
+`show-tunnel.sh` parsed `--until-touch` into a variable and then never passed
+it to `tunnel.py`, so the pattern ran without it and touching the glass did
+nothing. Reported as fixed once before it actually was, because the patch that
+added the flag to the invocation silently matched nothing and was not checked.
+
+Verified the only way that is worth anything: `/proc/<pid>/cmdline` carries the
+flag, and a finger on the glass ends the run with `touched - the touchscreen
+works on this panel`. Separately confirmed there is no phantom event source -
+watching the device with nobody touching it recorded zero events in 20 seconds
+and nothing queued.
+
+The playback loop now also drains queued input before arming, so the finger
+that dismissed the previous pattern cannot dismiss the next one the instant it
+appears - a failure that would look exactly like the pattern never coming up.
+
 ## 1.11.0 - 2026-09-15
 
 ### The Waveshare 7.0inch DSI-TOUCH-C works

@@ -337,7 +337,7 @@ near 51.8 MHz, the upstream driver at 36.5 MHz. The upstream one is what is
 verified here, and the spiral below is how: it came out **circular**, which it
 cannot do if the two axes are scaled differently.
 
-### Checking a round panel
+### Moving test patterns
 
 The 4.0 inch C is **round**: a 720x720 framebuffer on a circle of glass, so the
 four corners are not physically there. That breaks the usual check. A colour
@@ -351,15 +351,36 @@ sudo ./scripts/show-spiral.sh --until-touch
 spins a spiral in the middle of the screen until someone touches it. It is
 bounded by the inscribed circle, so it is entirely visible on a round panel and
 on a square one, and being rotationally symmetric it turns shear, a wrong
-stride or a wrong mode into an obvious oval.
+stride or a wrong mode into an obvious oval - which is how the 4.0 inch pixel
+clock question was settled.
 
-Motion is the other half of it. A still image proves a frame was painted; it
+On a rectangular panel that circle leaves most of the glass unused:
+
+```bash
+sudo ./scripts/show-tunnel.sh --until-touch
+```
+
+drives into a tunnel of concentric rectangles instead, filling the screen to
+all four edges, so it exercises the corners - which on a landscape panel is
+where a wrong mode shows itself first. The vanishing point sways from side to
+side while the nearest rectangle stays put, which reads as driving through a
+curving tunnel rather than as the image sliding about, and the lines fade
+around the hue circle through red, green, yellow and blue.
+
+The rectangles cannot collide, and not because it was tuned until they didn't:
+the gap between neighbours works out to `(s_k - s_k+1) * (halfwidth +/- sway)`,
+which stays positive for any sway under half the screen width.
+
+Motion is the point of both. A still image proves a frame was painted; it
 cannot prove the panel is still being refreshed, because a framebuffer written
 once and then frozen photographs exactly like one being driven perfectly. If
-the spiral turns, the pipeline is running end to end right now. The whole
-animation is rendered up front as a ring of complete frames and played back by
-writing one buffer per frame, which is what makes that possible in Python on
-this SoC.
+the pattern moves, the pipeline is running end to end right now. Each animation
+is rendered up front as a ring of complete frames and played back by writing
+one buffer per frame, which is what makes that possible in Python on this SoC.
+
+`--until-touch` makes the dismissal a touch test: the pattern goes away when a
+finger lands on the glass, on the panel in front of you, which is a stronger
+statement than any check this repository can make from software.
 
 ---
 

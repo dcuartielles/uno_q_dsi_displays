@@ -37,33 +37,16 @@ a wrong mode turn the circle into an oval or a staircase immediately, which a
 grid of colour bars does not do nearly as clearly.
 """
 import argparse
-import glob
 import math
-import os
-import re
-import select
 import sys
-import time
+
+import fbpaint
 
 # Arduino teal at the centre running out to white at the rim. The bright edge
 # is deliberate: on a round panel the rim is where the glass ends, so a picture
 # that is brightest there makes the circle itself the thing you are checking.
 CORE = (0, 129, 132)
 RIM = (255, 255, 255)
-
-
-def packer(bpp):
-    """Return (bytes_per_pixel, pack(r, g, b)) for this framebuffer."""
-    if bpp == 32:
-        return 4, lambda r, g, b: bytes((b, g, r, 0))
-    if bpp == 24:
-        return 3, lambda r, g, b: bytes((b, g, r))
-    if bpp == 16:
-        def pack(r, g, b):
-            v = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)
-            return bytes((v & 0xFF, v >> 8))
-        return 2, pack
-    raise SystemExit("unsupported bits_per_pixel: %s" % bpp)
 
 
 def brushes(max_t, stride, bpp_bytes):
@@ -102,7 +85,7 @@ def spiral_points(radius, turns, step_len):
 
 
 def render(width, height, stride, bpp, frames, turns):
-    bpp_bytes, pack = packer(bpp)
+    bpp_bytes, pack = fbpaint.packer(bpp)
 
     thin, thick = 2, 4
     disc = brushes(thick, stride, bpp_bytes)
@@ -142,29 +125,6 @@ def render(width, height, stride, bpp, frames, turns):
     return ring
 
 
-def touch_devices():
-    """Every input device that reports a multitouch position.
-
-    Matched on the capability rather than the driver name: this repository
-    already drives two different controllers and more will turn up.
-    """
-    devs = []
-    try:
-        blocks = open("/proc/bus/input/devices").read().split("\n\n")
-    except IOError:
-        blocks = []
-    for b in blocks:
-        m = re.search(r"B: ABS=([0-9a-f]+)", b)
-        if not m:
-            continue
-        # bit 0x35 is ABS_MT_POSITION_X - set by every multitouch panel here.
-        if not (int(m.group(1), 16) >> 0x35) & 1:
-            continue
-        for h in re.findall(r"event\d+", b):
-            devs.append("/dev/input/" + h)
-    return devs or sorted(glob.glob("/dev/input/event*"))
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--width", type=int, required=True)
@@ -182,60 +142,13 @@ def main():
     # One revolution every two seconds, whatever the frame rate - so --fps
     # buys smoothness rather than speed, and the ring stays a sane size.
     frames = max(8, min(36, int(round(args.fps * 2.0))))
+    frames = fbpaint.frame_budget(args.height, args.stride, frames)
     ring = render(args.width, args.height, args.stride, args.bpp,
                   frames, args.turns)
 
-    fds = {}
-    if args.until_touch:
-        for d in touch_devices():
-            try:
-                fds[os.open(d, os.O_RDONLY | os.O_NONBLOCK)] = d
-            except OSError:
-                pass
-        if not fds:
-            sys.stderr.write("  no touchscreen found - running on time only\n")
-
-    try:
-        fb = open("/dev/fb0", "r+b", buffering=0)
-    except IOError as exc:
-        sys.exit("cannot open /dev/fb0: %s" % exc)
-
-    deadline = float("inf") if args.hold else time.time() + args.seconds
-    period = 1.0 / args.fps
-    steals = 0
-    n = 0
-
-    while time.time() < deadline:
-        fb.seek(0)
-        fb.write(ring[n % frames])
-        n += 1
-
-        # Wait out the frame ON the touch descriptors, so a finger lands
-        # within a frame rather than within a poll interval.
-        if fds:
-            r, _, _ = select.select(list(fds), [], [], period)
-            for fd in r:
-                if os.read(fd, 4096):
-                    sys.exit(3)
-        else:
-            time.sleep(period)
-
-        # lightdm takes the console back for its own reasons, and when it does
-        # the spiral stops with nothing logged anywhere. Checked once a second
-        # rather than every frame - it is a sysfs read, not free.
-        if args.vt and n % max(1, int(args.fps)) == 0:
-            try:
-                active = open("/sys/class/tty/tty0/active").read().strip()
-            except IOError:
-                active = args.vt
-            if active != args.vt:
-                steals += 1
-                os.system("chvt %s" % args.vt[3:])
-                time.sleep(0.4)
-                sys.stderr.write("  console was taken back (%d) - resuming\n"
-                                 % steals)
-
-    sys.exit(0)
+    sys.exit(fbpaint.play(ring, fps=args.fps, seconds=args.seconds,
+                          vt=args.vt, hold=args.hold,
+                          until_touch=args.until_touch))
 
 
 if __name__ == "__main__":

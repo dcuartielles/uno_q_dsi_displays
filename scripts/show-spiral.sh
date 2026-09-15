@@ -29,6 +29,7 @@
 set -e
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$HERE/lib/common.sh"
+. "$HERE/lib/paint.sh"
 need_root "$@"
 
 SECONDS_TO_RUN=120
@@ -50,67 +51,13 @@ for a in "$@"; do
     prev=$a
 done
 
-[ -e /dev/fb0 ] || die "no /dev/fb0 - the display pipeline is not up"
-
-W=$(cut -d, -f1 /sys/class/graphics/fb0/virtual_size)
-H=$(cut -d, -f2 /sys/class/graphics/fb0/virtual_size)
-BPP=$(cat /sys/class/graphics/fb0/bits_per_pixel)
-
-# A framebuffer line is stride bytes, which is not always width * bpp/8 - on a
-# 720-wide panel the kernel pads 2880 up to 2944, and writing the short rows
-# shears the image into something that looks exactly like broken timings.
-STRIDE=$(cat /sys/class/graphics/fb0/stride 2>/dev/null || echo "")
-[ -n "$STRIDE" ] || STRIDE=$(( W * BPP / 8 ))
-
-BL=$(ls -d /sys/class/backlight/*/ 2>/dev/null | head -1)
-[ -n "$BL" ] && { echo 255 > "$BL/brightness" 2>/dev/null || true; }
-
-# Which VT to paint on - the same reasoning as show-number.sh. Consoles 1..6
-# get a getty from systemd's autovt the moment you switch to them, and 7 is
-# where X usually sits, so take the first console above those with no getty.
-PAINT_VT=${PAINT_VT:-}
-if [ -z "$PAINT_VT" ]; then
-    for _v in 8 9 10 11 12; do
-        [ -c "/dev/tty$_v" ] || continue
-        systemctl is-active "getty@tty$_v.service" >/dev/null 2>&1 && continue
-        PAINT_VT=$_v
-        break
-    done
-    [ -n "$PAINT_VT" ] || PAINT_VT=8
-fi
-
-# fgconsole prints nothing when there is no controlling terminal, which is the
-# case over adb - so its output is checked, not just its exit status.
-BACK_VT=$(fgconsole 2>/dev/null || true)
-case "$BACK_VT" in ''|*[!0-9]*) BACK_VT=7 ;; esac
-
-have_cmd chvt || die "chvt is not available"
-
-# Take the console and CONFIRM it. chvt returning 0 only means the request was
-# accepted; painting into a console someone else owns is discarded in silence.
-take_vt() {
-    chvt "$PAINT_VT" 2>/dev/null || return 1
-    _t=0
-    while [ "$_t" -lt 20 ]; do
-        [ "$(cat /sys/class/tty/tty0/active 2>/dev/null)" = "tty$PAINT_VT" ] \
-            && return 0
-        _t=$((_t + 1))
-        sleep 0.25
-    done
-    return 1
-}
-take_vt || die "could not take tty$PAINT_VT - something else holds the console"
-
-sleep 1
-if have_cmd setterm; then
-    setterm --cursor off > "/dev/tty$PAINT_VT" 2>/dev/null || true
-    setterm --blank 0 --powersave off > "/dev/tty$PAINT_VT" 2>/dev/null || true
-fi
+paint_fb_geometry
+paint_take_vt
 
 # Unlike show-number.sh --hold, this ALWAYS puts the desktop back. A still
 # image left on the glass is a photograph waiting to be taken; a spinning one
 # left behind is just a console nobody can get back.
-trap 'chvt "$BACK_VT" 2>/dev/null || true' EXIT INT TERM
+trap 'paint_restore_vt' EXIT INT TERM
 
 step "Spinning a spiral on the ${W}x${H} panel"
 set +e
@@ -129,4 +76,4 @@ case "$rc" in
     *) warn "spiral exited with status $rc" ;;
 esac
 
-chvt "$BACK_VT" 2>/dev/null || true
+paint_restore_vt
