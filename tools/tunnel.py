@@ -67,22 +67,6 @@ import fbpaint
 PALETTE_HUES = (0.0, 120.0, 60.0, 240.0)
 
 
-def hsv_to_rgb(h, s, v):
-    """Standard conversion. h in degrees, s and v in 0..1."""
-    h = h % 360.0
-    c = v * s
-    x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
-    m = v - c
-    # Wrapped, not just indexed. For a hue a hair below zero Python's modulo
-    # returns exactly 360.0 rather than 0.0, which lands on a seventh sector
-    # that does not exist - an IndexError in the middle of a test pattern,
-    # which is the last place anyone wants to debug one.
-    i = int(h // 60.0) % 6
-    rgb = ((c, x, 0.0), (x, c, 0.0), (0.0, c, x),
-           (0.0, x, c), (x, 0.0, c), (c, 0.0, x))[i]
-    return tuple(int(round((z + m) * 255)) for z in rgb)
-
-
 def colour_at(u):
     """Fade around the palette. u is a position on the loop, 0..1."""
     n = len(PALETTE_HUES)
@@ -98,7 +82,7 @@ def colour_at(u):
     d = (b - a + 540.0) % 360.0 - 180.0
     if d < -179.999:
         d = 180.0
-    return hsv_to_rgb(a + d * f, 0.95, 1.0)
+    return fbpaint.hsv_to_rgb(a + d * f, 0.95, 1.0)
 
 
 def render(width, height, stride, bpp, frames, depth_cycles, sway_cycles,

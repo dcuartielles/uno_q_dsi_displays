@@ -1,0 +1,108 @@
+# Waveshare 8.8inch DSI-TOUCH-A
+#
+# A derived panel, like the 12.3, 4.0 and 7.0 inch: the UNO Q kernel has no
+# mode for it and Arduino ships no overlay, but Raspberry Pi's tree carries the
+# mode, the DSI parameters and the vendor initialisation sequence.
+# scripts/16-install-derived-panel.sh fetches that driver, trims it to this
+# panel alone, builds it, and derives an overlay from Arduino's 10.1 inch one.
+#
+# 480x1920 on TWO DSI lanes, RGB888, 75 MHz. Physically 68 x 219 mm - a tall
+# narrow bar, the most extreme aspect ratio here by some distance.
+#
+# THE ".8" IN THE ID IS NOT DECORATION. Every other definition drops the
+# fraction - the 12.3 inch is arduino-12in-touch-a - but dropping it here would
+# collide with the Arduino 8inch DSI-TOUCH-A, which is a different panel with
+# different timings. They are one character apart on purpose.
+#
+# Fingerprint measured on the panel itself:
+#
+#     Goodix product ID   9271         shared with the 8, 10.1 and 12.3 inch
+#     config version      0x63         the 8 and 10.1 inch read 0x82
+#     touch resolution    480 x 1920   unique
+#     thresholds 0x8053   0x50 0x32    IDENTICAL TO THE 10.1 INCH
+#
+# THIS PANEL NEEDED A THIRD DETECTION STAGE, and it is worth understanding why
+# rather than copying the pattern blindly.
+#
+# The 8 inch and 10.1 inch are byte-identical from 0x8047 through 0x8052 - same
+# config version, same resolution, everything - and differ ONLY in the two
+# threshold bytes at 0x8053. So thresholds are the only thing that separates
+# that pair. But this panel has the 10.1 inch's exact thresholds, so the probe
+# that separates the 8 from the 10.1 cannot also separate the 10.1 from this.
+#
+# Widening one read was the obvious alternative and it does not work here. The
+# bytes that identify this panel (resolution, 0x8048-0x804b) and the bytes that
+# separate the other two (0x8053) are exactly 12 apart, and the Qualcomm CCI
+# controller on this carrier refuses any read over 12 bytes. A window covering
+# both exists but only just - and it would drag the filter, large-touch and
+# noise-reduction bytes into the fingerprint with it. Those are tuning, the
+# kind of value that moves between production batches, and a fingerprint built
+# on them eventually rejects a genuine panel.
+#
+# So the resolution gets its own stage. It is the value this repository reaches
+# for first anyway: a digitizer's reported size is a property of the glass.
+
+PANEL_ID="waveshare-8in8-touch-a"
+PANEL_DESC="Waveshare 8.8inch DSI-TOUCH-A (480x1920)"
+
+DERIVED_PANEL=1
+STOCK_MODE="480x1920"
+
+# --- the driver ------------------------------------------------------------
+DRIVER_URL="https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c"
+DRIVER_PATCHER="tools/patch-waveshare-panel.py"
+
+# The patcher finds this entry in the driver's match table and keeps only the
+# descriptor, mode and initialisation sequence it points at.
+PANEL_DT_COMPATIBLE="waveshare,8.8-dsi-touch-a"
+
+# --- the overlay -----------------------------------------------------------
+# Arduino's 10.1 inch overlay describes this carrier correctly; only the panel
+# node changes. Installed into the 5 inch slot because arduino-linux-config
+# hardcodes its display options and cannot register a new one.
+OVERLAY_TEMPLATE_OPTION="10-dsi-touch-a"
+CARRIER_DISPLAY_OPTION="5-dsi-touch-a"
+
+# GPIO lines on the panel's own controller at 0x45. Line numbers are Arduino's;
+# the polarity is Raspberry Pi's, because this driver sequences these itself
+# and Arduino's ACTIVE_LOW reset would invert its pulse and hold the panel in
+# reset - a dark screen with nothing wrong in dmesg.
+RESET_GPIO_LINE=1
+IOVCC_GPIO_LINE=4
+AVDD_GPIO_LINE=0
+
+# --- touch -----------------------------------------------------------------
+# No transform. The digitizer reports X across 0..480 and Y across 0..1920 and
+# the framebuffer is 480x1920, so the axes already agree - unlike the 12.3 inch
+# where touch runs 1920 across a 720-wide framebuffer and has to be transposed.
+# Worth a finger before trusting it, but the extents are unambiguous on a panel
+# this far from square.
+TOUCH_ADDR="0x5d"
+TOUCH_SWAP_XY=0
+TOUCH_INVERT_X=0
+TOUCH_INVERT_Y=0
+
+# goodix_ts also needs its reads split for the CCI bus, which refuses anything
+# over 12 bytes - scripts/17-install-goodix-fix.sh, run automatically.
+STOCK_DRIVERS="goodix_ts"
+
+# --- how detect-panel.sh recognises it -------------------------------------
+DETECT_ADDR="0x5d"
+DETECT_WRITE="0x81 0x40"
+DETECT_READ="4"
+DETECT_EXPECT="0x39 0x32 0x37 0x31"         # ASCII "9271"
+DETECT_NOTE="Goodix GT9271 reporting a 480x1920 digitizer - the 8.8 inch"
+
+# Stage 2: thresholds. Shared with the 10.1 inch, so this alone proves nothing
+# - it is here to exclude the 8 inch (5f 41), the 12.3 inch (64 32) and the
+# 4.0 inch (64 46).
+DETECT2_WRITE="0x80 0x53"
+DETECT2_READ="2"
+DETECT2_EXPECT="0x50 0x32"
+
+# Stage 3: touch resolution, little-endian - 0x01e0 = 480 across, 0x0780 =
+# 1920 down. This is what separates it from the 10.1 inch, which reads
+# 0x20 0x03 0x00 0x05 here.
+DETECT3_WRITE="0x80 0x48"
+DETECT3_READ="4"
+DETECT3_EXPECT="0xe0 0x01 0x80 0x07"

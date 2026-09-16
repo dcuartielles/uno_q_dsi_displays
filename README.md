@@ -215,6 +215,24 @@ check the **touch resolution** at `0x8048` as well - 720x1280 against
 reported size is a property of the glass while thresholds are tuning that can
 plausibly move between production batches.
 
+**And two stages were not enough either.** The Waveshare 8.8inch DSI-TOUCH-A
+shares the product ID with the 8, 10.1 and 12.3 inch AND the thresholds with
+the 10.1 inch, so the probe that separates the 8 from the 10.1 cannot also
+separate the 10.1 from the 8.8. A definition may now carry as many probes as
+it needs (`DETECT2_*`, `DETECT3_*`), and every one present must match.
+
+Widening a single read was the obvious alternative and it does not work. The
+bytes that identify the 8.8 inch (resolution, `0x8048`) and the bytes that
+separate the other two (`0x8053`) are exactly **12 apart** - which is exactly
+the largest read the CCI controller allows. A window covering both exists but
+only just, and it would drag the filter, large-touch and noise-reduction bytes
+into the fingerprint with it. Those are tuning, and a fingerprint built on them
+eventually rejects a genuine panel. Two narrow probes reading something
+intrinsic beat one wide one that reads calibration.
+
+The 8 inch deliberately gets no third stage: its thresholds already exclude the
+8.8 inch, and a stage that adds no way to succeed only adds a way to fail.
+
 **It cannot separate the 8 inch from the 10.1 inch, and nothing else can
 either.** Same product ID, same config version `0x82`, same touch resolution,
 same panel driver, same DRM mode - measured on both panels on the same board.
@@ -286,11 +304,12 @@ alongside it.
 
 ### Panels the kernel has never heard of
 
-Three panels here are neither *stock* nor *described*: the **Arduino 12.3inch
-DSI-TOUCH-A**, the **Waveshare 4.0inch DSI-TOUCH-C** and the **Waveshare
-7.0inch DSI-TOUCH-C**. The UNO Q kernel has no mode for any of them and
-Arduino ships no overlay, so they cannot be selected - and they cannot be
-described either, because the generator in this repository
+Four panels here are neither *stock* nor *described*: the **Arduino 12.3inch
+DSI-TOUCH-A**, the **Waveshare 4.0inch DSI-TOUCH-C**, the **Waveshare 7.0inch
+DSI-TOUCH-C** and the **Waveshare 8.8inch DSI-TOUCH-A**. The UNO Q kernel has
+no mode for any of them and Arduino ships no overlay, so they cannot be
+selected - and they cannot be described either, because the generator in this
+repository
 emits Raspberry Pi style hardware (an ATTINY at 0x45, an `edt-ft5x06` at 0x38)
 and these panels have a Waveshare GPIO chip and a Goodix.
 
@@ -306,7 +325,8 @@ sudo ./scripts/16-install-derived-panel.sh panels/waveshare-4in-touch-c.panel
 ```
 
 Adding another such panel usually means writing a `.panel` file and nothing
-else - the 7.0 inch C needed exactly that and no code at all.
+else - the 7.0 inch C and the 8.8 inch both needed exactly that, and no driver
+code at all.
 `tools/patch-waveshare-panel.py` reads the driver structure rather than naming
 symbols, so the compatible string is enough to find everything that belongs to
 a panel:
@@ -381,6 +401,40 @@ one buffer per frame, which is what makes that possible in Python on this SoC.
 `--until-touch` makes the dismissal a touch test: the pattern goes away when a
 finger lands on the glass, on the panel in front of you, which is a stronger
 statement than any check this repository can make from software.
+
+### A demo, for when the panel is the exhibit
+
+The test patterns above are for deciding whether a panel works. This one is for
+showing it off:
+
+```bash
+sudo ./scripts/show-vaporwave.sh              # touch the glass to leave
+sudo ./scripts/show-vaporwave.sh --rotate 270 # if it comes up inverted
+```
+
+A purple perspective grid converging on the centre of the image, a wireframe
+sun, ARDUINO spread across the frame on a travelling sine wave in rainbow
+colours, and wireframe spaceships crossing the sky trailing spheres out of
+their bases. Touching the screen returns the console, so the panel lands back
+on the login prompt.
+
+It composes in **logical** coordinates and maps through a quarter turn on the
+way out, which is what lets a landscape scene fill a 480x1920 bar. Under that
+turn a rectangle costs one slice per unit of its logical **width**, so tall
+thin shapes are cheap and wide flat ones are dear - which is why the letters
+are emitted as vertical runs of cells rather than cell by cell.
+
+Three layers, on two clocks. The grid loops, so it is pre-rendered into a ring
+of whole frames and played back one buffer write at a time. The ships run on
+wall-clock time - intervals of 5 to 30 seconds, crossings of 10 to 30 - which
+no ring a few seconds long could hold, so they are drawn per displayed frame.
+The word sits between the two, because some ships pass in front of it and some
+behind, and a layer baked into the ring could only ever be behind.
+
+The number of ships aloft is capped at four, and that cap is a measurement
+rather than a taste: six of them cost 86 ms a frame on an UNO Q against the
+66.7 ms that 15 fps allows, which drops frames and drags the whole scene. Four
+comes in at 40 ms. A launch arriving into a full sky is deferred, not dropped.
 
 ---
 

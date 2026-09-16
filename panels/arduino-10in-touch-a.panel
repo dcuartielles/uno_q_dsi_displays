@@ -87,3 +87,21 @@ DETECT_NOTE="Goodix GT9271, thresholds 50/32 - the 8 inch reads 5f/41"
 DETECT2_WRITE="0x80 0x53"
 DETECT2_READ="2"
 DETECT2_EXPECT="0x50 0x32"
+
+# Stage 3, added when the Waveshare 8.8inch DSI-TOUCH-A turned up reporting the
+# same product ID AND the same thresholds as this panel - so the two stages
+# above matched it completely and it was detected as a 10.1 inch.
+#
+# Touch resolution separates them: 800x1280 here, 480x1920 there. Little-endian,
+# so 0x0320 = 800 across and 0x0500 = 1280 down.
+#
+# Note what could NOT be done. The 8 inch and this panel are byte-identical
+# from 0x8047 to 0x8052 and differ only at the thresholds, so stage 2 has to
+# stay; and the resolution bytes are 12 away from the thresholds, which is
+# exactly the largest read the CCI controller allows. One wider probe would
+# have had to swallow the filter and noise tuning bytes in between - values
+# that move between production batches. Two narrow probes, each reading
+# something intrinsic, beat one wide one that reads calibration.
+DETECT3_WRITE="0x80 0x48"
+DETECT3_READ="4"
+DETECT3_EXPECT="0x20 0x03 0x00 0x05"

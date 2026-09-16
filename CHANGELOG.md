@@ -1,5 +1,93 @@
 # Changelog
 
+## 1.13.0 - 2026-09-16
+
+### The Waveshare 8.8inch DSI-TOUCH-A works
+
+Eighth panel definition, fourth down the *derived* path, and the most extreme
+aspect ratio here: 480x1920 on two lanes, 68 x 219 mm - a tall narrow bar.
+Verified on hardware: connector `card0-DSI-1` at 480x1920, the trimmed
+`ws-8-8-dsi-touch-a` driver bound to `5e94000.dsi.0` and the only mipi-dsi
+driver registered, and touch confirmed by a finger.
+
+```bash
+sudo ./scripts/detect-panel.sh --apply
+```
+
+No driver code, only a `.panel` file - the second panel in a row to need
+nothing else.
+
+### detect-panel.sh takes as many probes as a panel needs
+
+Two stages were not enough. This panel reports the same Goodix product ID as
+the 8, 10.1 and 12.3 inch **and** the same touch thresholds as the 10.1 inch,
+so it was detected as a 10.1 inch. But the 8 inch and the 10.1 inch are
+byte-identical from `0x8047` to `0x8052` and differ **only** at those
+thresholds - so the probe that separates that pair cannot also separate the
+10.1 inch from this one.
+
+A definition may now carry `DETECT2_*`, `DETECT3_*` and so on, and every stage
+present must match. The 8.8 inch is identified by product ID, then thresholds,
+then touch resolution:
+
+```
+arduino-10in-touch-a: 0x5d matched, probe 3 replied 0xe0 0x01 0x80 0x07,
+                      wanted 0x20 0x03 0x00 0x05
+ok  waveshare-8in8-touch-a: 0x5d replied 0x39 0x32 0x37 0x31,
+                            then 0x50 0x32, then 0xe0 0x01 0x80 0x07
+```
+
+**Widening one read was the alternative, and it was rejected on measurement.**
+The bytes that identify this panel (`0x8048`) and the bytes that separate the
+other two (`0x8053`) are exactly 12 apart - exactly the largest read the
+Qualcomm CCI controller allows. A window covering both exists, but only just,
+and it would pull the filter, large-touch and noise-reduction bytes into every
+fingerprint. Those are tuning that can move between production batches, and a
+fingerprint built on them eventually rejects a genuine panel.
+
+The 10.1 inch gained a third stage so it stops claiming this panel. The 8 inch
+deliberately did not: its thresholds already exclude the 8.8 inch, and this
+repository's own rule is that a stage adding no way to succeed only adds a way
+to fail.
+
+### A vaporwave demo
+
+`scripts/show-vaporwave.sh` - a purple perspective grid on the centre of the
+image, a wireframe sun a quarter of the width in from the right, ARDUINO spread
+across the frame on a travelling sine wave in rainbow colours, and wireframe
+spaceships crossing the sky trailing wireframe spheres from their bases.
+Touching the glass hands the console back, so the panel returns to the login
+prompt.
+
+Built for the 8.8 inch, which is why it composes in **logical** coordinates and
+maps through a quarter turn: a vaporwave horizon drawn upright into a 480x1920
+framebuffer is a letterbox on its side. Under the turn a rectangle costs one
+slice per unit of its logical width, so tall thin shapes are cheap - which is
+why every glyph is emitted as vertical runs of cells.
+
+Three layers on two clocks. The grid loops and is pre-rendered into a ring of
+whole frames; the ships run on wall-clock time, which no ring a few seconds
+long could hold, so `fbpaint.play()` gained an `overlay` hook and draws them
+per displayed frame. The word sits between the two groups of ships, because
+some pass in front of it and some behind - and a layer baked into the ring
+could only ever be behind.
+
+**The ship cap is a measurement, not a taste.** Variable intervals and
+durations let several crossings overlap, and six aloft cost 86 ms a frame on an
+UNO Q against the 66.7 ms that 15 fps allows - dropped frames, and the whole
+scene dragging. Capped at four it comes in at 40 ms, typical 20 ms. A launch
+arriving into a full sky is deferred rather than lost. Six needs the shortest
+interval to coincide with the longest crossing, so it is rare, which is exactly
+why it was worth catching on a bench instead of in front of an audience.
+
+### Shared machinery
+
+`lib/paint.sh` and `tools/fbpaint.py` now carry everything the moving patterns
+have in common - console handling, playback, what counts as a touchscreen, and
+`hsv_to_rgb`, which moved out of the tunnel when the demo's rainbow needed the
+same conversion for the same reason: interpolating colour in RGB runs through
+greys.
+
 ## 1.12.0 - 2026-09-15
 
 ### A tunnel, for panels that are not round

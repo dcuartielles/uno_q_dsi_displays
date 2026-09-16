@@ -27,16 +27,28 @@
 #                    Several alternatives may be separated by "|".
 #                    Omit to accept any ACK - presence alone is the signal.
 #
-# A panel may add a SECOND probe, and then both must match:
+# A panel may add FURTHER probes - DETECT2_*, DETECT3_*, DETECT4_* - and every
+# one present must match:
 #
 #   DETECT2_ADDR     defaults to DETECT_ADDR
 #   DETECT2_WRITE / DETECT2_READ / DETECT2_EXPECT   as above
 #
-# This exists because one probe was not enough. The Arduino 8inch and 10.1inch
-# report the same Goodix product ID, so telling them apart needs a second read
-# from deeper in the config block - but that read alone would not exclude the
-# 5 inch, whose value there is unknown. Requiring both keeps the identification
-# positive rather than merely non-contradictory.
+# The second exists because one probe was not enough. The Arduino 8inch and
+# 10.1inch report the same Goodix product ID, so telling them apart needs a
+# second read from deeper in the config block - but that read alone would not
+# exclude the 5 inch, whose value there is unknown. Requiring both keeps the
+# identification positive rather than merely non-contradictory.
+#
+# The third exists because two were not enough either. The Waveshare 8.8inch
+# shares the product ID with the 8, 10.1 and 12.3 inch AND the thresholds with
+# the 10.1 inch, so the pair that separates the 8 from the 10.1 cannot also
+# separate the 10.1 from the 8.8. Its touch resolution is what settles it.
+#
+# Widening a single read would have been the other way out, and was rejected:
+# the distinguishing bytes sit 12 bytes apart, the CCI controller refuses reads
+# over 12 bytes, and a window spanning both would pull the filter and noise
+# tuning bytes into the fingerprint - the calibration-shaped values a
+# fingerprint should not be built on.
 #
 # Adding a panel is therefore one .panel file. Run --scan with the new panel
 # connected and it prints what answered, ready to turn into a fingerprint.
@@ -248,24 +260,38 @@ for p in $(panel_files); do
         continue
     fi
 
-    # Second stage, when one probe cannot separate two panels.
-    want2=$(panel_field "$p" DETECT2_EXPECT)
-    if [ -n "$want2" ]; then
-        addr2=$(panel_field "$p" DETECT2_ADDR); addr2=${addr2:-$addr}
-        wr2=$(panel_field "$p" DETECT2_WRITE)
-        rl2=$(panel_field "$p" DETECT2_READ); rl2=${rl2:-1}
-        if ! got2=$(probe "$addr2" "$wr2" "$rl2"); then
-            say "  $id: $addr matched, but $addr2 did not answer the second probe"
+    # Further stages, when one probe cannot separate two panels. Every
+    # DETECT<n>_EXPECT present must match; a definition may use none of them,
+    # or two, or three. Gaps are allowed so a stage can be added without
+    # renumbering the ones already verified on hardware.
+    staged=1
+    trail=
+    n=2
+    while [ "$n" -le 4 ]; do
+        wantn=$(panel_field "$p" "DETECT${n}_EXPECT")
+        if [ -z "$wantn" ]; then
+            n=$((n + 1))
             continue
         fi
-        case "$got2" in
-            "$want2"*) ok "$id: $addr replied $got, then $got2" ;;
-            *) say "  $id: $addr matched, second probe replied $got2, wanted $want2"
-               continue ;;
+        addrn=$(panel_field "$p" "DETECT${n}_ADDR"); addrn=${addrn:-$addr}
+        wrn=$(panel_field "$p" "DETECT${n}_WRITE")
+        rln=$(panel_field "$p" "DETECT${n}_READ"); rln=${rln:-1}
+        if ! gotn=$(probe "$addrn" "$wrn" "$rln"); then
+            say "  $id: $addr matched, but $addrn did not answer probe $n"
+            staged=0
+            break
+        fi
+        case "$gotn" in
+            "$wantn"*) trail="$trail, then $gotn" ;;
+            *) say "  $id: $addr matched, probe $n replied $gotn, wanted $wantn"
+               staged=0
+               break ;;
         esac
-    else
-        ok "$id: $addr replied $got"
-    fi
+        n=$((n + 1))
+    done
+    [ "$staged" = 1 ] || continue
+
+    ok "$id: $addr replied $got$trail"
     MATCHES="$MATCHES $p"
 done
 

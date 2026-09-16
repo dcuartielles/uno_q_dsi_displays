@@ -27,6 +27,27 @@ DONE = 0
 TOUCHED = 3
 
 
+def hsv_to_rgb(h, s, v):
+    """Hue in degrees, saturation and value 0..1.
+
+    Here rather than in one pattern because two of them fade through hue, and
+    for the same reason: interpolating colours in RGB runs through greys.
+    Around the hue circle at full saturation there is no such dead spot.
+    """
+    h = h % 360.0
+    c = v * s
+    x = c * (1.0 - abs((h / 60.0) % 2.0 - 1.0))
+    m = v - c
+    # Wrapped, not just indexed. For a hue a hair below zero Python's modulo
+    # returns exactly 360.0 rather than 0.0, which lands on a seventh sector
+    # that does not exist - an IndexError in the middle of a test pattern,
+    # which is the last place anyone wants to debug one.
+    i = int(h // 60.0) % 6
+    rgb = ((c, x, 0.0), (x, c, 0.0), (0.0, c, x),
+           (0.0, x, c), (x, 0.0, c), (c, 0.0, x))[i]
+    return tuple(int(round((z + m) * 255)) for z in rgb)
+
+
 def packer(bpp):
     """Return (bytes_per_pixel, pack(r, g, b)) for this framebuffer."""
     if bpp == 32:
@@ -89,8 +110,19 @@ def frame_budget(height, stride, wanted, share=0.35):
     return wanted
 
 
-def play(ring, fps=15.0, seconds=120.0, vt="", hold=False, until_touch=False):
-    """Loop a ring of frames into /dev/fb0. Returns DONE or TOUCHED."""
+def play(ring, fps=15.0, seconds=120.0, vt="", hold=False,
+         until_touch=False, overlay=None):
+    """Loop a ring of frames into /dev/fb0. Returns DONE or TOUCHED.
+
+    `overlay` is for anything whose clock is not the ring's. It is called
+    as overlay(buf, elapsed) with a COPY of the frame that is about to go
+    out and the seconds since playback began, and may draw into it.
+
+    A ring can only hold motion that repeats within its own length, which
+    is a few seconds - anything on a longer cycle would need a ring too
+    big to hold. Drawing it per frame instead costs a buffer copy, and
+    buys a clock that runs in wall time.
+    """
     fds = {}
     if until_touch:
         for d in touch_devices():
@@ -107,7 +139,8 @@ def play(ring, fps=15.0, seconds=120.0, vt="", hold=False, until_touch=False):
         raise SystemExit("cannot open /dev/fb0: %s" % exc)
 
     frames = len(ring)
-    deadline = float("inf") if hold else time.time() + seconds
+    started = time.time()
+    deadline = float("inf") if hold else started + seconds
     period = 1.0 / fps
     steals = 0
     n = 0
@@ -123,8 +156,12 @@ def play(ring, fps=15.0, seconds=120.0, vt="", hold=False, until_touch=False):
             pass
 
     while time.time() < deadline:
+        frame = ring[n % frames]
+        if overlay is not None:
+            frame = bytearray(frame)
+            overlay(frame, time.time() - started)
         fb.seek(0)
-        fb.write(ring[n % frames])
+        fb.write(frame)
         n += 1
 
         if fds:
