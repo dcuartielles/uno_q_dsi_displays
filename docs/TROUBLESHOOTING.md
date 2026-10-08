@@ -5,6 +5,56 @@ late ones.
 
 ---
 
+## `--scan` shows EVERY address, and every read is `0x00`
+
+```
+  00:                         08 09 0a 0b 0c 0d 0e 0f
+  10: 10 11 12 13 14 15 16 17 18 19 1a 1b 1c 1d 1e 1f
+  ...all the way to 0x77...
+
+  0x45  ->  0x00
+  0x5d  ->  0x00
+```
+
+**The bus is not working. This is not a panel problem, and no panel definition
+will fix it.**
+
+Those two symptoms are one fact seen twice. An ACK on I2C *is* "SDA pulled
+low", and a byte is read by sampling SDA. So when something holds SDA down,
+every address appears to be present and every byte comes back as zeros.
+
+A healthy carrier answers on a handful of addresses - typically `0x45` and
+`0x5d` - and `0x45` reads `0x01` on a bare board, `0xff` once drivers are
+bound. `0x00` there means the carrier's own chip is not being read correctly,
+which puts the fault upstream of whatever panel is attached.
+
+`detect-panel.sh` recognises this and says so rather than reporting an
+unrecognised panel.
+
+Causes, in the order worth checking:
+
+1. **Power.** The carrier needs **5V at 3A**. A PC USB port is not enough.
+   Unpowered rails mean unpowered pull-ups, and the bus reads low.
+2. **The ribbon cable** - not fully seated, inserted backwards, or the
+   connector latch not closed. A partially seated FPC can short SDA down.
+3. **The wrong connector** - DSI and camera are the same shape.
+4. **A damaged cable.** It looks exactly like a software fault. One cost most
+   of an afternoon here while the driver was already correct.
+
+### The test that splits it
+
+Power down, **unplug the panel entirely**, power up, and scan again:
+
+```bash
+sudo ./scripts/detect-panel.sh --scan
+```
+
+- A bare board answers on a handful of addresses, with `0x45` reading `0x01`.
+- Still every address? Then the panel and its cable are innocent, and the
+  fault is the board, the carrier seating, or the supply.
+
+Two minutes, and it tells you which half of the system to stop looking at.
+
 ## Nothing on the panel at all, not even a backlight glow
 
 **Check power first.** A PC USB port is not enough. With a starved supply the

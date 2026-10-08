@@ -185,6 +185,61 @@ probe() {
     fi
 }
 
+# Addresses no panel here uses, spread across the range. On a healthy bus none
+# of them answer. They are the canaries for the one failure that looks like a
+# detection problem and is not.
+BUS_CANARIES="0x10 0x18 0x22 0x2a 0x33 0x41 0x4f 0x55 0x62 0x6b 0x70 0x77"
+
+# Returns 0 when the bus looks wedged.
+#
+# THE FAILURE THIS CATCHES
+# ------------------------
+# Seen on a fresh board: every address from 0x08 to 0x77 answering, and every
+# read returning 0x00. Those are the same fact twice. An ACK on I2C is "SDA
+# pulled low", and a byte is read by sampling SDA - so when something holds SDA
+# down, every address appears to be present and every byte comes back as zeros.
+#
+# Without this check the tool reports "no known panel recognised", which is
+# true but useless: it sends people looking for a fingerprint when the bus
+# itself is not working.
+bus_is_stuck() {
+    _hits=0; _total=0
+    for _c in $BUS_CANARIES; do
+        _total=$((_total + 1))
+        probe "$_c" "" 1 >/dev/null 2>&1 && _hits=$((_hits + 1))
+    done
+    # One stray answer could be real hardware this repository has not met.
+    # Every one of them answering cannot be.
+    [ "$_hits" -ge $((_total - 1)) ]
+}
+
+say_bus_stuck() {
+    say ""
+    warn "THE I2C BUS IS NOT WORKING. This is not a panel problem."
+    say ""
+    say "  Addresses that should be empty are all answering, which means SDA is"
+    say "  being held low. An ACK is SDA pulled low, and a byte is read by"
+    say "  sampling SDA - so a bus stuck low makes every address look present"
+    say "  and every read come back as 0x00. No panel definition can help."
+    say ""
+    say "  Most likely, in order:"
+    say ""
+    say "    1. POWER. The carrier needs 5V at 3A. A PC USB port is not enough."
+    say "       Unpowered rails mean unpowered pull-ups, and the bus reads low."
+    say "    2. The ribbon cable: not fully seated, inserted backwards, or the"
+    say "       connector latch not closed."
+    say "    3. Plugged into the camera connector rather than the DSI one."
+    say "    4. A damaged cable. It looks exactly like a software fault."
+    say ""
+    say "  ${C_BLD}The test that splits it${C_OFF}: power down, unplug the panel, power up,"
+    say "  and run --scan again."
+    say ""
+    say "    - a bare board answers on a handful of addresses, 0x45 reading 0x01"
+    say "    - still every address? then the panel and cable are innocent, and"
+    say "      the fault is the board, the carrier seating, or the supply"
+    say ""
+}
+
 # ------------------------------------------------------------------- scan ---
 if [ "$ACTION" = scan ]; then
     step "Carrier I2C bus is i2c-$BUS"
@@ -203,6 +258,13 @@ if [ "$ACTION" = scan ]; then
     done
     [ -n "$found" ] || warn "nothing answered - is the panel connected and powered?"
 
+    # A scan is a diagnostic, so this reports and carries on rather than
+    # stopping - the dump above is still worth seeing.
+    if bus_is_stuck; then
+        say_bus_stuck
+        exit 1
+    fi
+
     say ""
     say "To teach this repository a new panel, copy panels/TEMPLATE.panel and give"
     say "it a fingerprint built from an address unique to that panel:"
@@ -218,6 +280,15 @@ if [ "$ACTION" = scan ]; then
 fi
 
 # ----------------------------------------------------------------- detect ---
+# Before comparing anything against a fingerprint, check the bus can carry one.
+# A bus held low answers every probe with zeros, which no definition matches -
+# and the honest report is that the bus is broken, not that the panel is
+# unknown.
+if bus_is_stuck; then
+    say_bus_stuck
+    die "the I2C bus is not usable, so no panel can be identified on it."
+fi
+
 step "Looking for a known panel on i2c-$BUS"
 
 MATCHES=

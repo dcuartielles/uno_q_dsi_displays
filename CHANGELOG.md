@@ -1,5 +1,34 @@
 # Changelog
 
+## 1.13.1 - 2026-10-08
+
+### Fixed: a dead I2C bus was reported as an unrecognised panel
+
+A fresh board came back with every address from 0x08 to 0x77 answering and
+every read returning `0x00`. `detect-panel.sh` dutifully compared all that
+against every fingerprint, matched none, and reported "no known panel
+recognised" - true, useless, and it sends someone hunting for a fingerprint
+that cannot exist.
+
+Those two symptoms are one fact seen twice. An ACK on I2C **is** "SDA pulled
+low", and a byte is read by sampling SDA, so a bus held low makes every address
+look present and every byte read as zeros. The bus was broken; no panel
+definition would have helped.
+
+Detection now probes a dozen addresses no panel here uses. On a healthy bus
+none of them answer; when all of them do, the tool says the bus is stuck,
+lists the causes worth checking in order - power first, since the carrier wants
+5V at 3A and an unpowered rail means unpowered pull-ups - and stops instead of
+blaming the panel.
+
+It also gives the test that splits the problem in two: unplug the panel and
+scan again. A bare board answers on a handful of addresses with `0x45` reading
+`0x01`; if every address still answers, the panel and cable are innocent and
+the fault is the board, the carrier seating or the supply.
+
+One stray answer is tolerated, because it could be real hardware this
+repository has not met. Twelve of twelve cannot be.
+
 ## 1.13.0 - 2026-09-16
 
 ### The Waveshare 8.8inch DSI-TOUCH-A works
