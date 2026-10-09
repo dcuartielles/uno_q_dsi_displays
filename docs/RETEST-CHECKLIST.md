@@ -37,8 +37,8 @@ when each subsystem's code last changed.
 | Panel | Bench | LCD | DETECT | TOUCH |
 | --- | --- | :-: | :-: | :-: |
 | Arduino 5inch | 09-09 | ✅ | 🟠 | ✅ |
-| Arduino 8inch | 09-08 | 🟡 | 🟡 | 🔴 |
-| Arduino 10.1inch | 09-08 | 🟡 | 🟠 | 🔴 |
+| Arduino 8inch | 09-08 | 🟡 | 🟡 | 🟠 |
+| Arduino 10.1inch | 09-08 | 🟡 | 🟠 | 🟠 |
 | Arduino 12.3inch | 09-09 | 🟠 | 🟡 | ✅ |
 | Waveshare 4.0inch C | 09-15 | ✅ | 🔴 | 🟠 |
 | Waveshare 7.0inch C | 09-15 | ✅ | ✅ | 🟡 |
@@ -48,13 +48,32 @@ when each subsystem's code last changed.
 🔴 never verified · 🟠 verified, then the code under it changed · 🟡 verified,
 but indirectly or long ago · ✅ current
 
+Record disputed? Say so in the Results table and correct the panel file. A
+bench date nobody wrote down is worth less than a memory, but both are worth
+less than a finger on the glass today.
+
 ### The two that matter most
 
-**🔴 The 8 inch and 10.1 inch have never had working touch.** Both were benched
-on 09-08. The Goodix 12-byte read fix landed on **09-09**, in a commit titled
-*"the 12.3 inch works, and Goodix touch was broken everywhere"*. So at the
-moment those two panels were signed off, touch was broken on every Goodix panel
-and nobody yet knew. Their touch has not been exercised since the fix existed.
+**🟠 The 8 inch and 10.1 inch have never had touch verified against the driver
+they would run today.** Both were benched on 09-08; the Goodix 12-byte read
+fix landed on 09-09.
+
+There is a disagreement in the record here, and it is worth stating rather than
+resolving by assertion. The 1.8.0 changelog says touch on the 5, 8 and 10.1
+inch was *"checked for the presence of an input device"* rather than by a
+finger, and asserts the fault *"affects the 5, 8 and 10.1 inch too"* - but that
+assertion is an inference from the shared controller and the shared 12-byte
+ceiling, not a measurement on those panels. dcuartielles recalls testing touch
+on every panel.
+
+Both readings leave the same gap, which is why it does not need settling first:
+
+- if touch was broken then, it has never been seen working;
+- if touch worked then, it worked with the **unpatched** driver, and since
+  09-09 these panels would run `goodix_ts` with reads split into 12-byte
+  chunks - code they have never run.
+
+Thirty seconds with a finger settles it, and also corrects the record.
 
 **🔴 The 4.0 inch C has no recorded signature.** The only definition never
 replayed against real hardware. Its touch orientation is also marked unverified
@@ -137,8 +156,8 @@ square panel the extents cannot tell you - only pointing can.
 
 Four panels, about an hour, highest value first.
 
-1. **10.1 inch** - 🔴 touch, 🟠 detect, 🟡 lcd. All three in one swap.
-2. **8 inch** - 🔴 touch, 🟡 the rest. Do it straight after: its thresholds are
+1. **10.1 inch** - 🟠 touch, 🟠 detect, 🟡 lcd. All three in one swap.
+2. **8 inch** - 🟠 touch, 🟡 the rest. Do it straight after: its thresholds are
    the only thing separating it from the 10.1 inch, so confirm that too.
 3. **4.0 inch C** - 🔴 detect, 🟠 touch orientation. Also the only way to
    exercise the Goodix branch of `capture-panel.sh`, untested since 1.14.1.
