@@ -1,5 +1,11 @@
 # Adding a new panel
 
+> **Start here instead if you can run it:** `sudo tools/capture-panel.sh <name>`
+> collects the scan, the config dump, the DRM state and a proposed fingerprint
+> in one go, and leaves a draft definition to fill in. This page explains what
+> every field means and what to do when the automatic answer is not enough.
+> [CONTRIBUTING.md](../CONTRIBUTING.md) covers opening the pull request.
+
 The single most useful fact in this repository:
 
 > **Raspberry Pi has already done the hard work for most of these panels.**

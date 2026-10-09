@@ -66,6 +66,18 @@ jobs:
           PY
           echo "no stray control characters"
 
+      - name: No fingerprint matches two panels
+        # The check a human reviewer cannot do reliably. Every panel here
+        # ships a dump of what its touch controller answers, so every
+        # definition can be replayed against every recorded panel with no
+        # hardware at all - and each must be matched by exactly one
+        # definition, its own.
+        #
+        # Three panels have been confidently detected as a DIFFERENT panel in
+        # this repository's history, each caught by hand and late. This is
+        # that review, done exhaustively, in a second.
+        run: python tools/check-fingerprints.py -v
+
       - name: Documentation agrees with the measurements
         # The docs quote precise figures, which makes a stale one more
         # dangerous than a missing one - people believe it. This recomputes

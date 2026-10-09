@@ -660,6 +660,24 @@ the conclusions were reached — see
 
 ---
 
+## Adding a panel
+
+Pull requests adding a display are welcome. One command on the board collects
+everything a reviewer needs, including a proposed fingerprint worked out
+against every panel anyone has recorded:
+
+```bash
+sudo tools/capture-panel.sh waveshare-5in5-touch-a
+```
+
+The reviewer will never have your panel, so a panel pull request is judged on
+evidence rather than by trying it. [CONTRIBUTING.md](CONTRIBUTING.md) explains
+what to send and why, and `tools/check-fingerprints.py` checks the part a human
+reviewer cannot do reliably - that your fingerprint matches your panel and
+nobody else's. It runs in CI, with no hardware.
+
+---
+
 ## Credit and licence
 
 The hard information here comes from the **Raspberry Pi kernel tree**, which

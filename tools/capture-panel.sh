@@ -1,0 +1,214 @@
+#!/bin/sh
+# Collect everything a new panel's pull request needs. One command, on the
+# board, with the panel attached.
+#
+#   sudo tools/capture-panel.sh my-panel-name
+#
+# It writes submissions/<name>/ and prints what to do next. Nothing is sent
+# anywhere; you review it and attach it to the pull request yourself.
+#
+# WHY A SCRIPT RATHER THAN A CHECKLIST
+# ------------------------------------
+# Because the reviewer does not have your panel, and never will. A pull request
+# adding a panel can only be judged on evidence, and the evidence has to be the
+# raw answers from the hardware - not a description of them.
+#
+# The one file that matters most is the touch controller's config dump. It is
+# what lets tools/check-fingerprints.py answer, with no hardware at all, the
+# question that has gone wrong three times here: does this fingerprint pick out
+# one panel, or does it also match somebody else's?
+#
+# Your dump then protects every panel added after yours, which is the whole
+# bargain: contribute the evidence, and the next contributor cannot break your
+# panel without CI noticing.
+set -e
+HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+. "$HERE/lib/common.sh"
+need_root "$@"
+
+NAME=${1:-}
+if [ -z "$NAME" ]; then
+    die "usage: sudo tools/capture-panel.sh <panel-id>
+
+    Use the name the definition will have, lowercase with dashes, matching
+    how the panel is sold. For example:
+
+        waveshare-5in5-touch-a
+        arduino-12in-touch-a
+
+    Keep any fraction in the name if dropping it would collide with another
+    panel - the 8.8 inch is waveshare-8in8-touch-a precisely because
+    arduino-8in-touch-a is a different panel."
+fi
+
+OUT="$HERE/submissions/$NAME"
+mkdir -p "$OUT"
+step "Collecting into submissions/$NAME"
+
+# ------------------------------------------------------------ environment ---
+{
+    echo "# captured $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "panel-id: $NAME"
+    echo "model: $(tr -d '\0' < /proc/device-tree/model 2>/dev/null)"
+    echo "kernel: $(uname -r)"
+    echo "arch: $(uname -m)"
+    if [ -r /etc/os-release ]; then
+        . /etc/os-release
+        echo "os: $PRETTY_NAME"
+    fi
+    echo ""
+    echo "# carrier"
+    arduino-linux-config carrier status 2>&1 | sed 's/^/  /' || echo "  (arduino-linux-config not available)"
+    echo ""
+    echo "# display overlays this image ships"
+    ls /boot/efi/dtb/qcom/*panel* 2>/dev/null | sed 's/^/  /' || echo "  (none found)"
+} > "$OUT/environment.txt" 2>&1
+ok "environment.txt"
+
+# -------------------------------------------------------------- i2c scan ---
+# The scan is the first thing a reviewer reads. It also catches the failure
+# that masquerades as an unknown panel: a bus held low answers on every
+# address with 0x00, and no fingerprint can be built from that.
+sh "$HERE/scripts/detect-panel.sh" --scan > "$OUT/i2c-scan.txt" 2>&1 || true
+ok "i2c-scan.txt"
+
+if grep -q "THE I2C BUS IS NOT WORKING" "$OUT/i2c-scan.txt" 2>/dev/null; then
+    say ""
+    warn "The I2C bus is not working, so there is nothing to fingerprint yet."
+    say "  See submissions/$NAME/i2c-scan.txt - fix that first."
+    say "  docs/TROUBLESHOOTING.md has the causes in order."
+    exit 1
+fi
+
+# ------------------------------------------------------- touch controller ---
+# A Goodix at 0x5d is what every panel here has used so far. If yours is
+# something else the dump will be empty, which is fine - say so in the pull
+# request and include whatever your controller does answer.
+if sh "$HERE/tools/goodix-config.sh" dump "$OUT/goodix-0x5d.txt" >/dev/null 2>&1; then
+    ok "goodix-0x5d.txt"
+    HAVE_DUMP=1
+else
+    warn "no Goodix at 0x5d - skipping the config dump"
+    rm -f "$OUT/goodix-0x5d.txt"
+    HAVE_DUMP=0
+fi
+
+# ------------------------------------------------------------- the panel ---
+{
+    echo "# DRM connectors"
+    for c in /sys/class/drm/card*-DSI-*/; do
+        [ -d "$c" ] || continue
+        echo "$(basename "$c"): $(cat "$c/status" 2>/dev/null)"
+        echo "  modes: $(tr '\n' ' ' < "$c/modes" 2>/dev/null)"
+    done
+    echo ""
+    echo "# framebuffer"
+    for f in virtual_size stride bits_per_pixel; do
+        [ -r "/sys/class/graphics/fb0/$f" ] && \
+            echo "  $f: $(cat "/sys/class/graphics/fb0/$f")"
+    done
+    echo ""
+    echo "# panel / dsi drivers bound"
+    for d in /sys/bus/mipi-dsi/drivers/*/; do
+        [ -d "$d" ] || continue
+        for l in "$d"*; do
+            [ -L "$l" ] && echo "  $(basename "$d") <- $(basename "$l")"
+        done
+    done
+    echo ""
+    echo "# input devices"
+    grep -E '^(N|H|B: ABS)' /proc/bus/input/devices 2>/dev/null | sed 's/^/  /'
+} > "$OUT/display.txt" 2>&1
+ok "display.txt"
+
+dmesg 2>/dev/null | grep -iE 'dsi|panel|goodix|drm|i2c|cci' | tail -120 \
+    > "$OUT/dmesg.txt" 2>&1 || true
+ok "dmesg.txt"
+
+# -------------------------------------------------- propose a fingerprint ---
+if [ "$HAVE_DUMP" = 1 ]; then
+    step "Proposing a fingerprint"
+    # Compares your panel against every panel anyone has recorded, and picks
+    # the shortest chain of reads that separates yours from all of them.
+    python3 "$HERE/tools/check-fingerprints.py" \
+        --suggest "$OUT/goodix-0x5d.txt" | tee "$OUT/fingerprint.txt" || true
+fi
+
+# -------------------------------------------------------------- the draft ---
+DRAFT="$OUT/DRAFT.panel"
+if [ ! -f "$DRAFT" ]; then
+    {
+        echo "# $NAME - DRAFT, generated by tools/capture-panel.sh"
+        echo "#"
+        echo "# Fill in the blanks, copy to panels/$NAME.panel, and read"
+        echo "# docs/ADDING-A-PANEL.md for what each field means."
+        echo "#"
+        echo "# Say WHY, not just what. Every definition here explains the"
+        echo "# things that are not obvious from the values - which panels it"
+        echo "# is easily confused with, what was measured rather than assumed,"
+        echo "# and what is still unverified. That is what makes the next"
+        echo "# person's job possible."
+        echo ""
+        echo "PANEL_ID=\"$NAME\""
+        echo "PANEL_DESC=\"\"                 # e.g. Waveshare 5.5inch DSI-TOUCH-A (720x1280)"
+        echo ""
+        echo "# Pick one path - see docs/ADDING-A-PANEL.md:"
+        echo "#   STOCK_SUPPORT=1   the kernel and Arduino already have it"
+        echo "#   DERIVED_PANEL=1   an upstream driver trimmed to this panel"
+        echo "#   (neither)         described from scratch in this file"
+        echo "DERIVED_PANEL=1"
+        echo "STOCK_MODE=\"\"                 # e.g. 720x1280"
+        echo ""
+        echo "DRIVER_URL=\"https://raw.githubusercontent.com/raspberrypi/linux/rpi-6.12.y/drivers/gpu/drm/panel/panel-waveshare-dsi-v2.c\""
+        echo "DRIVER_PATCHER=\"tools/patch-waveshare-panel.py\""
+        echo "PANEL_DT_COMPATIBLE=\"\"        # the entry in that driver's match table"
+        echo ""
+        echo "OVERLAY_TEMPLATE_OPTION=\"10-dsi-touch-a\""
+        echo "CARRIER_DISPLAY_OPTION=\"5-dsi-touch-a\""
+        echo ""
+        echo "RESET_GPIO_LINE=1"
+        echo "IOVCC_GPIO_LINE=4"
+        echo "AVDD_GPIO_LINE=0"
+        echo ""
+        echo "TOUCH_ADDR=\"0x5d\""
+        echo "TOUCH_SWAP_XY=0"
+        echo "TOUCH_INVERT_X=0"
+        echo "TOUCH_INVERT_Y=0"
+        echo "STOCK_DRIVERS=\"goodix_ts\""
+        echo ""
+        echo "DETECT_ADDR=\"0x5d\""
+        echo "DETECT_NOTE=\"\"                # one line, what the match means"
+        if [ -f "$OUT/fingerprint.txt" ]; then
+            echo ""
+            echo "# --- proposed by capture-panel.sh, check it before trusting it ---"
+            sed -n '/^DETECT/p' "$OUT/fingerprint.txt"
+        fi
+    } > "$DRAFT"
+    ok "DRAFT.panel"
+fi
+
+# ---------------------------------------------------------------- wrap up ---
+say ""
+step "Next"
+say ""
+say "  1. Finish ${C_BLD}submissions/$NAME/DRAFT.panel${C_OFF} and copy it to"
+say "     panels/$NAME.panel"
+say ""
+say "  2. Install it and look at the screen:"
+say "        sudo ./install.sh panels/$NAME.panel     # or 16-install-derived-panel.sh"
+say "        sudo reboot"
+say "        sudo ./scripts/45-confirm-display.sh panels/$NAME.panel"
+say "        sudo ./scripts/show-spiral.sh --until-touch"
+say ""
+say "     The spiral is the honest test: it proves the panel is still being"
+say "     refreshed, not just that one frame was painted - and the touch that"
+say "     dismisses it proves the digitizer works on the glass in front of you."
+say ""
+say "  3. Copy the dump where CI can use it:"
+say "        cp submissions/$NAME/goodix-0x5d.txt bench/results/goodix/$NAME.txt"
+say ""
+say "  4. Check nothing collides:"
+say "        python3 tools/check-fingerprints.py -v"
+say ""
+say "  5. Open the pull request. CONTRIBUTING.md lists what to paste in."
+say ""

@@ -37,3 +37,13 @@ tools/.prepare-run.sh
 # (_v001, _v002, ...) and the script that generates them.
 pitch/
 *_v[0-9][0-9][0-9].docx
+
+# Material people send in to diagnose a problem - photographs, logs, scans.
+# Useful while working a case, not part of the repository: it is someone
+# else's hardware, often their desk and their surroundings too.
+inputs/
+
+# What tools/capture-panel.sh collects on a contributor's board. Useful while
+# preparing a pull request; only the config dump belongs in the repository,
+# and that goes to bench/results/goodix/.
+submissions/

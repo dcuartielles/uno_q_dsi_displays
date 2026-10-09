@@ -1,5 +1,55 @@
 # Changelog
 
+## 1.14.0 - 2026-10-09
+
+### A way for other people to add panels
+
+The awkward fact about a panel pull request is that **the reviewer does not
+have the panel and never will**, so it cannot be judged by trying it. Three
+pieces now make it judgeable on evidence instead.
+
+**`tools/capture-panel.sh`** - one command on the board, with the panel
+attached:
+
+```bash
+sudo tools/capture-panel.sh waveshare-5in5-touch-a
+```
+
+collects the I2C scan, the touch controller's config dump, the DRM state, the
+relevant `dmesg`, a proposed fingerprint, and a draft definition to fill in. It
+stops early and points at the troubleshooting page if the bus is held low,
+since there is nothing to fingerprint until that is fixed.
+
+**`tools/check-fingerprints.py`** - the check a human reviewer cannot do
+reliably. A detection definition is a short script of reads against the touch
+controller, and a dump records what that controller answers, so every
+definition can be replayed against every recorded panel **with no hardware**.
+Each recorded panel must be matched by exactly one definition - its own.
+
+That invariant has been broken three times here, each caught by hand and late:
+the 7.0 inch C detected as an Arduino 5 inch, the 8.8 inch detected as a 10.1
+inch, and the 8 inch and 10.1 inch which cannot be separated at all. Removing
+the 10.1 inch's third probe reproduces the second of those, and the check
+catches it in a second.
+
+It also enforces two rules statically: no probe may read more than 12 bytes,
+because the CCI controller on this carrier refuses that, and every expected
+value must fit the read it belongs to.
+
+`--suggest` runs it the other way, proposing the shortest chain of reads that
+separates a new panel from every panel on file, preferring values that are
+properties of the hardware over tuning that moves between batches. On its first
+run it found the 8.8 inch definition carries a redundant stage: product ID plus
+touch resolution already identifies it, and the threshold probe in the middle
+excludes nothing the resolution does not.
+
+**`CONTRIBUTING.md` and a pull request template** - what to send, why each
+piece is asked for, and what gets a pull request sent back. A photograph of the
+panel running is required, because every software check here can pass while the
+screen shows garbage.
+
+CI now runs the replay on every push and pull request.
+
 ## 1.13.1 - 2026-10-08
 
 ### Fixed: a dead I2C bus was reported as an unrecognised panel
