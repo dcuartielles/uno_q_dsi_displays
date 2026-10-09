@@ -26,8 +26,8 @@ HERE=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$HERE/lib/common.sh"
 need_root "$@"
 
-NAME=${1:-}
-if [ -z "$NAME" ]; then
+PANEL=${1:-}
+if [ -z "$PANEL" ]; then
     die "usage: sudo tools/capture-panel.sh <panel-id>
 
     Use the name the definition will have, lowercase with dashes, matching
@@ -41,20 +41,22 @@ if [ -z "$NAME" ]; then
     arduino-8in-touch-a is a different panel."
 fi
 
-OUT="$HERE/submissions/$NAME"
+OUT="$HERE/submissions/$PANEL"
 mkdir -p "$OUT"
-step "Collecting into submissions/$NAME"
+step "Collecting into submissions/$PANEL"
 
 # ------------------------------------------------------------ environment ---
 {
     echo "# captured $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-    echo "panel-id: $NAME"
+    echo "panel-id: $PANEL"
     echo "model: $(tr -d '\0' < /proc/device-tree/model 2>/dev/null)"
     echo "kernel: $(uname -r)"
     echo "arch: $(uname -m)"
+    # In a subshell on purpose. /etc/os-release defines NAME, among others,
+    # and sourcing it in this one overwrote the panel name - every path after
+    # it was then built from "Debian GNU/Linux".
     if [ -r /etc/os-release ]; then
-        . /etc/os-release
-        echo "os: $PRETTY_NAME"
+        echo "os: $( . /etc/os-release; printf '%s' "$PRETTY_NAME" )"
     fi
     echo ""
     echo "# carrier"
@@ -71,11 +73,13 @@ ok "environment.txt"
 # address with 0x00, and no fingerprint can be built from that.
 sh "$HERE/scripts/detect-panel.sh" --scan > "$OUT/i2c-scan.txt" 2>&1 || true
 ok "i2c-scan.txt"
+sed -n 's/.*Carrier I2C bus is i2c-\([0-9]*\).*/\1/p' "$OUT/i2c-scan.txt" \
+    | head -1 > "$OUT/.bus" 2>/dev/null || true
 
 if grep -q "THE I2C BUS IS NOT WORKING" "$OUT/i2c-scan.txt" 2>/dev/null; then
     say ""
     warn "The I2C bus is not working, so there is nothing to fingerprint yet."
-    say "  See submissions/$NAME/i2c-scan.txt - fix that first."
+    say "  See submissions/$PANEL/i2c-scan.txt - fix that first."
     say "  docs/TROUBLESHOOTING.md has the causes in order."
     exit 1
 fi
@@ -84,13 +88,61 @@ fi
 # A Goodix at 0x5d is what every panel here has used so far. If yours is
 # something else the dump will be empty, which is fine - say so in the pull
 # request and include whatever your controller does answer.
-if sh "$HERE/tools/goodix-config.sh" dump "$OUT/goodix-0x5d.txt" >/dev/null 2>&1; then
+# A dump is real when it has DATA LINES, not when the command exited 0 and
+# not when the file contains the characters "0x" - the header says
+# "addr=0x5d" whether or not anything answered, and testing for that accepted
+# a file of pure comments as a dump.
+has_data() {
+    [ -s "$1" ] && grep -qE '^[0-9a-f]{4}: *0x' "$1" 2>/dev/null
+}
+
+DUMP=
+DUMP_KIND=
+
+sh "$HERE/tools/goodix-config.sh" dump "$OUT/goodix-0x5d.txt" >/dev/null 2>&1 || true
+if has_data "$OUT/goodix-0x5d.txt"; then
     ok "goodix-0x5d.txt"
-    HAVE_DUMP=1
+    DUMP="$OUT/goodix-0x5d.txt"
+    DUMP_KIND=goodix
 else
-    warn "no Goodix at 0x5d - skipping the config dump"
     rm -f "$OUT/goodix-0x5d.txt"
-    HAVE_DUMP=0
+    say "  no Goodix at 0x5d"
+fi
+
+# Whatever else is on the bus. A panel with a different controller still needs
+# a signature, and the Raspberry Pi style ATTINY is the other one seen here.
+if i2ctransfer -y -f "$(cat "$OUT/.bus" 2>/dev/null || echo 2)" w1@0x45 0x80 r1 >/dev/null 2>&1; then
+    {
+        echo "# rpi-style panel ATTINY config block"
+        echo "# addr=0x45 first=0x80 count=16"
+        echo "# kernel=$(uname -r)"
+        echo "#"
+        echo "# Only REG_ID (0x80) is identity. 0x81-0x83 are PORTA/PORTB/PORTC,"
+        echo "# live pin state that changes with what the driver has done, so a"
+        echo "# fingerprint built on them would drift."
+        for r in 80 81 82 83 84 85 86 87 88 89 8a 8b 8c 8d 8e 8f; do
+            v=$(i2ctransfer -y -f "$(cat "$OUT/.bus" 2>/dev/null || echo 2)" \
+                    w1@0x45 "0x$r" r1 2>/dev/null)
+            printf '00%s: %s\n' "$r" "${v:-unreadable}"
+        done
+    } > "$OUT/attiny-0x45.txt"
+    if has_data "$OUT/attiny-0x45.txt"; then
+        ok "attiny-0x45.txt"
+        if [ -z "$DUMP" ]; then
+            DUMP="$OUT/attiny-0x45.txt"
+            DUMP_KIND=attiny
+        fi
+    else
+        rm -f "$OUT/attiny-0x45.txt"
+    fi
+fi
+
+if [ -z "$DUMP" ]; then
+    say ""
+    warn "No touch controller answered, so there is no signature to record."
+    say "  Detection needs something on the bus that identifies this panel."
+    say "  Include your i2c-scan.txt in the pull request and say what the"
+    say "  panel uses - docs/ADDING-A-PANEL.md section 8 covers the case."
 fi
 
 # ------------------------------------------------------------- the panel ---
@@ -126,21 +178,21 @@ dmesg 2>/dev/null | grep -iE 'dsi|panel|goodix|drm|i2c|cci' | tail -120 \
 ok "dmesg.txt"
 
 # -------------------------------------------------- propose a fingerprint ---
-if [ "$HAVE_DUMP" = 1 ]; then
+if [ -n "$DUMP" ]; then
     step "Proposing a fingerprint"
     # Compares your panel against every panel anyone has recorded, and picks
     # the shortest chain of reads that separates yours from all of them.
     python3 "$HERE/tools/check-fingerprints.py" \
-        --suggest "$OUT/goodix-0x5d.txt" | tee "$OUT/fingerprint.txt" || true
+        --suggest "$DUMP" | tee "$OUT/fingerprint.txt" || true
 fi
 
 # -------------------------------------------------------------- the draft ---
 DRAFT="$OUT/DRAFT.panel"
 if [ ! -f "$DRAFT" ]; then
     {
-        echo "# $NAME - DRAFT, generated by tools/capture-panel.sh"
+        echo "# $PANEL - DRAFT, generated by tools/capture-panel.sh"
         echo "#"
-        echo "# Fill in the blanks, copy to panels/$NAME.panel, and read"
+        echo "# Fill in the blanks, copy to panels/$PANEL.panel, and read"
         echo "# docs/ADDING-A-PANEL.md for what each field means."
         echo "#"
         echo "# Say WHY, not just what. Every definition here explains the"
@@ -149,7 +201,7 @@ if [ ! -f "$DRAFT" ]; then
         echo "# and what is still unverified. That is what makes the next"
         echo "# person's job possible."
         echo ""
-        echo "PANEL_ID=\"$NAME\""
+        echo "PANEL_ID=\"$PANEL\""
         echo "PANEL_DESC=\"\"                 # e.g. Waveshare 5.5inch DSI-TOUCH-A (720x1280)"
         echo ""
         echo "# Pick one path - see docs/ADDING-A-PANEL.md:"
@@ -191,21 +243,27 @@ fi
 say ""
 step "Next"
 say ""
-say "  1. Finish ${C_BLD}submissions/$NAME/DRAFT.panel${C_OFF} and copy it to"
-say "     panels/$NAME.panel"
+say "  1. Finish ${C_BLD}submissions/$PANEL/DRAFT.panel${C_OFF} and copy it to"
+say "     panels/$PANEL.panel"
 say ""
 say "  2. Install it and look at the screen:"
-say "        sudo ./install.sh panels/$NAME.panel     # or 16-install-derived-panel.sh"
+say "        sudo ./install.sh panels/$PANEL.panel     # or 16-install-derived-panel.sh"
 say "        sudo reboot"
-say "        sudo ./scripts/45-confirm-display.sh panels/$NAME.panel"
+say "        sudo ./scripts/45-confirm-display.sh panels/$PANEL.panel"
 say "        sudo ./scripts/show-spiral.sh --until-touch"
 say ""
 say "     The spiral is the honest test: it proves the panel is still being"
 say "     refreshed, not just that one frame was painted - and the touch that"
 say "     dismisses it proves the digitizer works on the glass in front of you."
 say ""
-say "  3. Copy the dump where CI can use it:"
-say "        cp submissions/$NAME/goodix-0x5d.txt bench/results/goodix/$NAME.txt"
+if [ -n "$DUMP" ]; then
+    say "  3. Copy the signature where CI can use it, so it protects your"
+    say "     panel against every panel added after yours:"
+    say "        mkdir -p bench/results/$DUMP_KIND"
+    say "        cp submissions/$PANEL/$(basename "$DUMP") bench/results/$DUMP_KIND/$PANEL.txt"
+else
+    say "  3. (no signature was captured - see the warning above)"
+fi
 say ""
 say "  4. Check nothing collides:"
 say "        python3 tools/check-fingerprints.py -v"

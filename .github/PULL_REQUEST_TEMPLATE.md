@@ -25,7 +25,7 @@ Paste `python3 tools/check-fingerprints.py -v`:
 
 ```
 
-- [ ] `bench/results/goodix/<name>.txt` is included, so CI can replay it
+- [ ] `bench/results/<controller>/<name>.txt` is included, so CI can replay it
 - [ ] no probe reads more than 12 bytes (the CCI limit)
 - [ ] every probe stage rules something out
 

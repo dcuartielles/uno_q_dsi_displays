@@ -54,14 +54,22 @@ replays every definition against every recorded panel and insists each one is
 matched by exactly one definition - its own. It runs in CI, needs no hardware,
 and takes a second.
 
+It compares **like with like**: only panels recorded at the same controller
+address. Nobody has recorded what a Goodix panel answers at 0x45, so claiming
+your 0x45 fingerprint is ambiguous against one would be inventing a finding.
+Where there is no evidence, it says so rather than guessing in either
+direction.
+
 The bargain is mutual: **contribute the dump, and nobody can add a panel after
 yours that breaks yours without CI noticing.**
 
 ## What the pull request must contain
 
 1. **`panels/<name>.panel`** - the definition.
-2. **`bench/results/goodix/<name>.txt`** - the config dump, so CI can replay it.
-   (A different controller? Include whatever it answers, and say so.)
+2. **`bench/results/<controller>/<name>.txt`** - the signature dump, so CI can
+   replay it. `goodix/` for a Goodix at 0x5d, `attiny/` for a Raspberry Pi
+   style ATTINY at 0x45, a new directory for anything else. `capture-panel.sh`
+   prints the exact copy command for whichever one your panel has.
 3. **Evidence in the description** - the template asks for it:
    - the output of `sudo ./scripts/detect-panel.sh` showing your panel matched
      and every other rejected

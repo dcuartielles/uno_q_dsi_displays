@@ -1,0 +1,25 @@
+# rpi-style panel ATTINY config block
+# addr=0x45 bus=i2c-0 first=0x80 count=16
+# kernel=7.0.0-g122c2c22d838
+# panel=Waveshare 4.3inch DSI, captured 2026-10-09
+#
+# Only REG_ID (0x80) is identity. 0x81-0x83 are PORTA/PORTB/PORTC - live pin
+# state, which changes with what the driver has done to the panel, so a
+# fingerprint built on them would drift. 0x84 and up are unimplemented and
+# read back 0xff.
+0080: 0xc3
+0081: 0xff
+0082: 0x85
+0083: 0x10
+0084: 0xff
+0085: 0xff
+0086: 0xff
+0087: 0xff
+0088: 0xff
+0089: 0xff
+008a: 0xff
+008b: 0xff
+008c: 0xff
+008d: 0xff
+008e: 0xff
+008f: 0xff

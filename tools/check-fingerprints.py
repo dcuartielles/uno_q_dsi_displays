@@ -71,14 +71,20 @@ def load_dump(path):
                     d["addr"] = int(m.group(1), 16)
                 m = re.search(r"id=(.+)$", line)
                 if m:
-                    d["id"] = [int(b, 16) for b in m.group(1).split()]
+                    # Tolerant on purpose. goodix-config.sh writes the word
+                    # "unreadable" for a register nothing answered, and a dump
+                    # with no controller behind it is all of those - which used
+                    # to crash this on int("unreadable", 16).
+                    d["id"] = [int(b, 16) for b in m.group(1).split()
+                               if re.match(r"^0x[0-9a-fA-F]+$", b)]
                 continue
             m = re.match(r"^([0-9a-fA-F]{4}):\s*(.+)$", line)
             if not m:
                 continue
             base = int(m.group(1), 16)
             for i, b in enumerate(m.group(2).split()):
-                d["regs"][base + i] = int(b, 16)
+                if re.match(r"^0x[0-9a-fA-F]+$", b):
+                    d["regs"][base + i] = int(b, 16)
     return d
 
 
@@ -92,9 +98,12 @@ def read_dump(dump, addr, write, nbytes):
         return None
     if not write:
         return None                      # a plain read, not recorded
-    if len(write) != 2:
-        return None                      # not a 16-bit register address
-    reg = (write[0] << 8) | write[1]
+    if len(write) == 2:
+        reg = (write[0] << 8) | write[1]     # Goodix: 16-bit register address
+    elif len(write) == 1:
+        reg = write[0]                       # ATTINY: 8-bit
+    else:
+        return None
 
     if reg == PRODUCT_ID_REG:
         if not dump["id"]:
@@ -247,20 +256,67 @@ CANDIDATES = [
 ]
 
 
+def candidates_for(dump):
+    """Registers worth probing on this controller, best first.
+
+    For a Goodix the order is a judgement this repository has paid for. For
+    anything else there is no such knowledge, so the dump's own registers are
+    used in address order - with the caveat printed, because this tool cannot
+    tell an identity register from live pin state.
+    """
+    if dump["addr"] == 0x5D:
+        return CANDIDATES, True
+    return [("register 0x%02x" % r, r, 1)
+            for r in sorted(dump["regs"])], False
+
+
 def suggest(dump, others):
     """Propose the shortest chain that separates this panel from every other."""
     print("Dump: %s  (controller at 0x%02x)" % (dump["name"], dump["addr"] or 0))
+
+    # Only panels recorded at the SAME address can be compared. Nobody
+    # recorded what a Goodix panel answers at 0x45, or an ATTINY panel at
+    # 0x5d, so those comparisons have no evidence either way - and reporting
+    # them as "ambiguous" would be inventing a finding.
+    comparable = [o for o in others if o["addr"] == dump["addr"]]
+    skipped = [o["name"] for o in others if o["addr"] != dump["addr"]]
+    if skipped:
+        print("Not compared (recorded at a different address): %s"
+              % ", ".join(sorted(skipped)))
     print("")
 
+    if not comparable:
+        print("No other panel has a recorded signature at 0x%02x, so there is"
+              % (dump["addr"] or 0))
+        print("nothing here to collide with yet - yours would be the first.")
+        print("")
+        print("Registers your controller answered:")
+        for r in sorted(dump["regs"]):
+            print("    0x%02x -> 0x%02x" % (r, dump["regs"][r]))
+        print("")
+        print("Pick one that identifies the HARDWARE. A part number or ID")
+        print("register is right; anything that reflects live pin state or")
+        print("calibration will drift, and a fingerprint built on it")
+        print("eventually rejects a genuine panel.")
+        return 0
+
+    cand, known = candidates_for(dump)
+    if not known:
+        print("This controller is not one with a known register map here, so")
+        print("these are simply the registers it answered. This tool cannot")
+        print("tell an identity register from live pin state - check the")
+        print("datasheet before trusting one.")
+        print("")
+
     chosen, excluded = [], set()
-    for label, reg, n in CANDIDATES:
+    for label, reg, n in cand:
         write = [reg >> 8, reg & 0xFF]
         mine = read_dump(dump, dump["addr"], write, n)
         if mine is None:
             continue
 
         newly = set()
-        for o in others:
+        for o in comparable:
             if o["name"] in excluded:
                 continue
             theirs = read_dump(o, o["addr"], write, n)
@@ -277,16 +333,16 @@ def suggest(dump, others):
         if keep:
             chosen.append((label, reg, n, mine))
             excluded |= newly
-        if len(excluded) == len(others):
+        if len(excluded) == len(comparable):
             break
 
     print("")
-    remaining = sorted(o["name"] for o in others if o["name"] not in excluded)
+    remaining = sorted(o["name"] for o in comparable if o["name"] not in excluded)
     if remaining:
         print("STILL AMBIGUOUS against: %s" % ", ".join(remaining))
         print("")
         print("Those panels answer identically everywhere this looked. Dump")
-        print("more of the config block and diff it:")
+        print("more of the controller and diff it - for a Goodix:")
         print("    sudo tools/goodix-config.sh dump mine.txt")
         print("    tools/goodix-config.sh diff theirs.txt mine.txt")
         print("")
@@ -319,17 +375,20 @@ def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--suggest", metavar="DUMP",
                     help="propose a fingerprint for a new panel's dump")
-    ap.add_argument("--dumps", default=os.path.join(ROOT, "bench", "results",
-                                                    "goodix"),
-                    help="directory of recorded dumps")
+    ap.add_argument("--dumps", default=os.path.join(ROOT, "bench", "results"),
+                    help="where recorded dumps live (searched one level deep)")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args(argv)
 
     panels = [load_panel(p) for p in sorted(glob.glob(
         os.path.join(ROOT, "panels", "*.panel")))
         if "TEMPLATE" not in p]
-    dumps = [load_dump(p) for p in sorted(glob.glob(
-        os.path.join(a.dumps, "*.txt")))]
+    # One level down, so bench/results/goodix/ and bench/results/attiny/ are
+    # both found. A file with no "addr=" header is not a dump - bench/results
+    # holds benchmark logs too - so it is skipped rather than misread.
+    found = sorted(glob.glob(os.path.join(a.dumps, "*.txt"))
+                   + glob.glob(os.path.join(a.dumps, "*", "*.txt")))
+    dumps = [d for d in (load_dump(p) for p in found) if d["addr"] is not None]
 
     if a.suggest:
         mine = load_dump(a.suggest)

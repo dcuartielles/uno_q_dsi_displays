@@ -1,5 +1,58 @@
 # Changelog
 
+## 1.14.1 - 2026-10-09
+
+### Fixed: three faults found the first time capture-panel.sh was actually run
+
+It had been written, syntax-checked, documented and shipped without once being
+executed on a board - and it is the script a stranger runs first. All three
+faults were invisible to `sh -n`.
+
+**It renamed itself after the operating system.** The environment block sources
+`/etc/os-release` to read `PRETTY_NAME`, and that file also defines `NAME` -
+which was the script's own variable for the panel. Everything after it was
+built from the wrong value: it created `submissions/Debian GNU/Linux/` and told
+the user to copy their definition to `panels/Debian GNU/Linux.panel`. The
+variable is now `PANEL`, and `os-release` is sourced in a subshell where it
+cannot reach anything.
+
+**It accepted a dump with no data in it.** `goodix-config.sh` exits 0 even when
+nothing answers, writing a file whose every value is the word `unreadable`. The
+emptiness test was a grep for `0x`, which matches the *header* - `# addr=0x5d`
+- so 112 bytes of pure comment passed as a dump, and
+`check-fingerprints.py` then crashed on `int("unreadable", 16)`. The test now
+looks for a data line, and the parser tolerates unreadable values.
+
+**It assumed every panel has a Goodix.** The 4.3 inch has a Raspberry Pi style
+ATTINY at 0x45 instead, so no signature was captured at all. It now dumps that
+controller too, and the rest of the run refers to whichever dump it got.
+
+### Fingerprints can be checked on any controller, not just Goodix
+
+`check-fingerprints.py` now reads 8-bit register addresses as well as 16-bit,
+finds dumps in any `bench/results/<controller>/` directory, and **compares like
+with like**: only panels recorded at the same controller address.
+
+That last one matters. Run against the 4.3 inch, `--suggest` previously
+reported "STILL AMBIGUOUS" against all seven other panels and advised dumping
+more of the Goodix config block. Both wrong, and wrong in the worst direction -
+it read as a finding. Nothing had been compared: its candidate registers are
+Goodix ones, which an ATTINY dump does not have. Where there is no evidence it
+now says so, and for an unknown controller it proposes from the registers the
+dump actually contains, with the caveat that it cannot tell an identity
+register from live pin state.
+
+### The 4.3 inch has a recorded signature at last
+
+`bench/results/attiny/waveshare-800x480.txt`. Its `REG_ID` reads `0xc3`, which
+is what the definition has always expected - now evidence rather than lore.
+`0x81`-`0x83` are PORTA/PORTB/PORTC, live pin state that would drift, and
+`0x84` upward are unimplemented and read `0xff`, so `REG_ID` alone is the
+identity and the existing definition was right to use it.
+
+That definition is no longer reported as unverifiable: all eight are now
+checked against recorded hardware.
+
 ## 1.14.0 - 2026-10-09
 
 ### A way for other people to add panels
