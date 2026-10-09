@@ -1,118 +1,179 @@
 # Panel re-test checklist
 
-A procedure for putting panels back on a bench and confirming detection still
-works end to end, plus the specific run that is currently outstanding.
+What still needs putting on a bench, broken down by **which part** of each
+panel is in doubt - because "re-test the 10.1 inch" is not an instruction
+anybody can act on.
 
-## Why this is needed at all
+## Three things, and they fail independently
 
-`tools/check-fingerprints.py` replays every definition against every recorded
-dump and proves they are **mutually consistent**. It cannot prove the dumps
-still describe the hardware, and there is a circularity worth naming:
+A panel is three subsystems that break in different ways, are fixed by
+different code, and need different evidence:
 
-> When a definition's expected bytes were taken **from its own dump**, the
-> replay is checking a value against its own source. If the recording were
-> unrepresentative, both would agree and the panel would still fail on a real
-> bench.
+| | What it is | What proves it | What breaks it |
+| --- | --- | --- | --- |
+| **LCD** | the picture | an eye on a moving pattern | panel driver, timings, overlay, the install path |
+| **DETECT** | the I2C fingerprint that identifies the panel | `detect-panel.sh` picking exactly one, and a fresh dump matching the recorded one | the `DETECT_*` fields, `detect-panel.sh` |
+| **TOUCH** | the digitizer actually working, the right way round | a finger, and coordinates that land where you pressed | the touch driver patches, `TOUCH_SWAP_XY` / `INVERT_*` |
 
-That is exactly how the probes added in 1.11.0 and 1.13.0 were written. CI is
-green and those stages have never been answered by a physical panel. Only
-hardware tests the premise; the offline check tests the logic.
+A panel can have a perfect picture and dead touch. It can have working touch
+mapped backwards. It can be detected as something else entirely and still light
+up. These are not one test.
 
-## The outstanding run
+## Why a bench is needed at all
 
-| | Panel | Why it is on the list |
-| --- | --- | --- |
-| 🔴 | **Waveshare 4.0inch C** | the only definition with **no recorded signature** - never replayed against real hardware. Also the only way to exercise the Goodix branch of `capture-panel.sh`, untested since 1.14.1 |
-| 🟠 | **Arduino 5inch** | second probe added 2026-09-15 (the 7 inch collision); last on a bench ~09-09, so the probe **predates** every test of this panel |
-| 🟠 | **Arduino 10.1inch** | third probe added 2026-09-16 (the 8.8 inch collision); last on a bench ~09-08, same problem |
-| 🟡 | **Arduino 8inch** | definition unchanged, but its recording is the oldest (09-08) and its thresholds are the *only* thing separating it from the 10.1 inch. Cheap while the 10.1 is out |
-| 🟡 | **Arduino 12.3inch** | optional. Unchanged definition, recording from 09-09 |
+`tools/check-fingerprints.py` proves the definitions are **mutually consistent
+with the recorded dumps**. It cannot prove a dump still describes the hardware,
+and where a probe's expected bytes were taken **from its own dump**, the replay
+compares a value with its own source. CI stays green while a real panel fails.
 
-About an hour for the first four.
+That covers DETECT only. Nothing offline says anything at all about LCD or
+TOUCH.
 
-## Per panel
+## What needs what
 
-With the board **powered off**, swap the panel, then power up.
+Bench date = the last time that physical panel was verified. Compared against
+when each subsystem's code last changed.
+
+| Panel | Bench | LCD | DETECT | TOUCH |
+| --- | --- | :-: | :-: | :-: |
+| Arduino 5inch | 09-09 | ✅ | 🟠 | ✅ |
+| Arduino 8inch | 09-08 | 🟡 | 🟡 | 🔴 |
+| Arduino 10.1inch | 09-08 | 🟡 | 🟠 | 🔴 |
+| Arduino 12.3inch | 09-09 | 🟠 | 🟡 | ✅ |
+| Waveshare 4.0inch C | 09-15 | ✅ | 🔴 | 🟠 |
+| Waveshare 7.0inch C | 09-15 | ✅ | ✅ | 🟡 |
+| Waveshare 800×480 | 10-09 | ✅ | ✅ | 🟡 |
+| Waveshare 8.8inch | 09-16 | ✅ | ✅ | 🟡 |
+
+🔴 never verified · 🟠 verified, then the code under it changed · 🟡 verified,
+but indirectly or long ago · ✅ current
+
+### The two that matter most
+
+**🔴 The 8 inch and 10.1 inch have never had working touch.** Both were benched
+on 09-08. The Goodix 12-byte read fix landed on **09-09**, in a commit titled
+*"the 12.3 inch works, and Goodix touch was broken everywhere"*. So at the
+moment those two panels were signed off, touch was broken on every Goodix panel
+and nobody yet knew. Their touch has not been exercised since the fix existed.
+
+**🔴 The 4.0 inch C has no recorded signature.** The only definition never
+replayed against real hardware. Its touch orientation is also marked unverified
+in the panel file - it is square, so the axes cannot be deduced from the
+reported extents the way they can on a tall panel.
+
+### The rest, briefly
+
+- **🟠 5 inch and 10.1 inch DETECT** - each gained a probe stage (09-15, 09-16)
+  *after* that panel was last on a bench. Those stages have never been answered
+  by real hardware.
+- **🟠 12.3 inch LCD** - the derived install path changed on 09-15 (the private
+  `unoq,` compatible, and the generic patcher replacing the 12.3-specific one).
+  The panel has not been installed with that code.
+- **🟠 4.0 inch TOUCH** - orientation unverified, see above.
+- **🟡 8 inch / 10.1 inch LCD** - the stock install path changed on 09-09,
+  after their bench. Probably benign, cheap to confirm while they are out.
+- **🟡 7.0 / 8.8 inch TOUCH** - touch confirmed with a finger, but orientation
+  was *deduced* from the reported extents rather than checked by pointing.
+- **🟡 800×480 TOUCH** - the device appeared on 10-09 but the run was cut short
+  before a finger confirmed it.
+- **🟡 every panel's DETECT** - `detect-panel.sh` gained the stuck-bus guard on
+  10-08. It has run cleanly on the 800×480 since, and nowhere else. It rides
+  along free with any DETECT test below.
+
+## The three tests
+
+### LCD
 
 ```bash
-# 1. does detection still pick exactly one, and the right one?
-sudo ./scripts/detect-panel.sh
-
-# 2. capture a fresh signature
-sudo tools/capture-panel.sh <panel-id>
-
-# 3. does the hardware still say what we recorded?
-tools/goodix-config.sh diff bench/results/goodix/<panel-id>.txt \
-                            submissions/<panel-id>/goodix-0x5d.txt
-
-# 4. install, reboot, and look at it
 sudo ./scripts/detect-panel.sh --apply
 sudo reboot
-# after it comes back:
-sudo ./scripts/show-spiral.sh --until-touch     # or show-tunnel.sh on a wide panel
+# after it is back:
+sudo ./scripts/show-spiral.sh --until-touch      # round or square panels
+sudo ./scripts/show-tunnel.sh --until-touch      # wide panels; fills the corners
 ```
 
-### What counts as a pass
-
-- [ ] detection reports **exactly one** match, and it is the right panel
-- [ ] every other definition is rejected with a reason, not silently
-- [ ] the fresh dump is **identical** to the recorded one, or the difference is
-      understood and written down
 - [ ] connector `connected`, at the expected mode
-- [ ] the expected driver is bound to `5e94000.dsi.0`
-- [ ] the picture is **correct to the eye** - every software check here can
-      pass while the screen shows garbage
-- [ ] **touch dismisses the pattern**, with a finger, on that glass
+- [ ] the expected driver bound to `5e94000.dsi.0`
+- [ ] **the picture is right to the eye** - no tearing, shear or stepped edges
 
-The last two are the ones no script can do. The spiral is the honest test: it
-proves the panel is still being refreshed rather than showing one frame that
-was painted and then froze, and the touch that dismisses it proves the
-digitizer works.
+The moving patterns are the honest test: a framebuffer written once and then
+frozen photographs exactly like one being driven properly, so motion is the
+only thing that proves the panel is still being refreshed.
 
-### Record for each
+### DETECT
 
+```bash
+sudo ./scripts/detect-panel.sh
+sudo tools/capture-panel.sh <panel-id>
+tools/goodix-config.sh diff bench/results/goodix/<panel-id>.txt \
+                            submissions/<panel-id>/goodix-0x5d.txt
 ```
-panel:        <id>
-date:         <when>
-detection:    one match / collision / none      (paste the output)
-dump vs file: identical / differs (how)
-connector:    card0-DSI-1 <status> <mode>
-driver:       <bound driver>
-picture:      correct / wrong (how)
-touch:        works / no / n/a
+
+- [ ] **exactly one** match, and it is the right panel
+- [ ] every other definition rejected **with a reason**, not silently
+- [ ] the fresh dump is identical to the recorded one, or the difference is
+      understood and written down
+- [ ] the stuck-bus guard did not fire on a healthy bus
+
+### TOUCH
+
+Function first, then orientation - they are different questions.
+
+```bash
+sudo ./scripts/test-touch.sh        # reports ABS_MT_POSITION for 20 seconds
 ```
+
+- [ ] events appear at all - this is what the 8 and 10.1 inch have never shown
+- [ ] press **top-left**: both coordinates near their minimum
+- [ ] press **bottom-right**: both near their maximum
+- [ ] press along the **long edge**: the coordinate that moves is the one that
+      matches the framebuffer's long axis
+
+If the axes are transposed or run backwards, set `TOUCH_SWAP_XY`,
+`TOUCH_INVERT_X`, `TOUCH_INVERT_Y` in the `.panel` file and reinstall. On a
+square panel the extents cannot tell you - only pointing can.
+
+## Suggested order
+
+Four panels, about an hour, highest value first.
+
+1. **10.1 inch** - 🔴 touch, 🟠 detect, 🟡 lcd. All three in one swap.
+2. **8 inch** - 🔴 touch, 🟡 the rest. Do it straight after: its thresholds are
+   the only thing separating it from the 10.1 inch, so confirm that too.
+3. **4.0 inch C** - 🔴 detect, 🟠 touch orientation. Also the only way to
+   exercise the Goodix branch of `capture-panel.sh`, untested since 1.14.1.
+4. **5 inch** - 🟠 detect only. Quick.
+
+Then if there is appetite: **12.3 inch** for its 🟠 LCD install path.
 
 ## Afterwards
 
 ```bash
-# fresh signatures into the tree, including the 4.0 inch's first one
 cp submissions/<id>/goodix-0x5d.txt bench/results/goodix/<id>.txt
-
-python3 tools/check-fingerprints.py -v      # still exactly one match each
+python3 tools/check-fingerprints.py -v
 python3 tools/check-docs.py
 ```
 
-Then commit the updated dumps. A recording refreshed against hardware is worth
-more than the date on the old one.
+Commit the refreshed dumps, and update the **Bench** column above. A recording
+confirmed against hardware is worth more than the date on the old one.
 
-## Two things to settle while the panels are out
+## To settle while the panels are out
 
-- **The 8.8 inch carries a redundant probe stage.** `--suggest` found that its
+- **The 8.8 inch carries a redundant probe stage.** `--suggest` found its
   product ID plus touch resolution already identify it, so the threshold stage
-  in the middle excludes nothing. The repository's own rule is that a stage
-  adding no way to succeed only adds a way to fail. Worth trimming - but only
-  with the panel attached to re-verify.
-- **The 8 inch and 10.1 inch cannot be told apart.** Confirm this is still
-  true rather than assuming it: same product ID, config version, touch
-  resolution, driver and mode, differing only in two threshold bytes. If a
-  newer batch differs anywhere else, that is worth knowing.
+  excludes nothing. This repository's own rule is that a stage adding no way to
+  succeed only adds a way to fail - but trim it with the panel attached.
+- **Confirm the 8 inch and 10.1 inch still cannot be told apart.** Same product
+  ID, config version, touch resolution, driver and mode; differing only in two
+  threshold bytes. If a newer batch differs anywhere else, that is worth
+  knowing.
 
 ## Results
 
-| Panel | Date | Detection | Dump | Picture | Touch | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| waveshare-4in-touch-c | | | | | | |
-| arduino-5in-touch-a | | | | | | |
-| arduino-10in-touch-a | | | | | | |
-| arduino-8in-touch-a | | | | | | |
-| arduino-12in-touch-a | | | | | | |
+| Panel | Date | LCD | DETECT | TOUCH | Notes |
+| --- | --- | --- | --- | --- | --- |
+| arduino-10in-touch-a | | | | | |
+| arduino-8in-touch-a | | | | | |
+| waveshare-4in-touch-c | | | | | |
+| arduino-5in-touch-a | | | | | |
+| arduino-12in-touch-a | | | | | |
