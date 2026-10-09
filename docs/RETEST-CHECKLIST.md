@@ -142,7 +142,7 @@ Function first, then orientation - they are different questions.
 sudo ./scripts/test-touch.sh        # reports ABS_MT_POSITION for 20 seconds
 ```
 
-- [ ] events appear at all - this is what the 8 and 10.1 inch have never shown
+- [ ] events appear at all - on the 8 and 10.1 inch this is the open question
 - [ ] press **top-left**: both coordinates near their minimum
 - [ ] press **bottom-right**: both near their maximum
 - [ ] press along the **long edge**: the coordinate that moves is the one that
