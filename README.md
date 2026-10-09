@@ -632,23 +632,44 @@ than leaving you with a black screen at the next boot. If that happens, re-run
 install.sh / uninstall.sh     one-shot install and full revert
 update.sh                     bring an existing install up to date
 VERSION / CHANGELOG.md        what you are running, and what changed
+CONTRIBUTING.md               how to add a panel by pull request, and why
+
 panels/*.panel                panel definitions (TEMPLATE.panel to start)
+
 scripts/detect-panel.sh       identify the connected panel, or pick one by hand
 scripts/10-update-os.sh       vanilla/old image -> kernel with carrier support
 scripts/15-select-stock-panel.sh  select a panel the kernel already supports
+scripts/16-install-derived-panel.sh  upstream driver trimmed + derived overlay
+scripts/17-install-goodix-fix.sh  split Goodix reads for the 12-byte CCI limit
 scripts/20-build-drivers.sh   fetch, patch and install the kernel modules
 scripts/25-install-dkms.sh    register with DKMS so kernel upgrades rebuild
 scripts/30-install-overlay.sh generate, compile and enable the overlay
 scripts/35-install-recovery.sh boot-recovery service for flaky-I2C boots
 scripts/40-verify.sh          post-reboot checks
 scripts/45-confirm-display.sh show a pattern and ask whether it looks right
-scripts/show-number.sh        paint a big number, optionally until touched
+
+                              -- what to put on the glass --
 scripts/test-display.sh       colour bars on the panel
 scripts/test-touch.sh         report touch events
+scripts/show-number.sh        paint a big number, optionally until touched
+scripts/show-spiral.sh        a turning spiral; round panels, and proof of refresh
+scripts/show-tunnel.sh        a rectangular tunnel; fills a wide panel's corners
+scripts/show-vaporwave.sh     the demo: grid, sun, ARDUINO, ships
+
+                              -- contributing a panel --
+tools/capture-panel.sh        collect everything a pull request needs, in one go
+tools/check-fingerprints.py   replay every panel against every definition (CI)
 tools/goodix-config.sh        dump and diff a touch controller's config
+
 tools/panel-batch.sh          test a run of panels, one command each
-tools/                        generators and kernel-source patchers
+tools/patch-waveshare-panel.py  trim the upstream driver to a single panel
+tools/derive-overlay.py       build an overlay from Arduino's 10.1 inch one
+tools/fbpaint.py              shared playback for the moving patterns
+lib/paint.sh                  shared framebuffer geometry and console handling
+tools/                        other generators and kernel-source patchers
+
 bench/                        reliability benchmark (camera + cold boots)
+bench/results/goodix/         what each panel's touch controller answers
 docs/                         adding a panel, how it works, troubleshooting
 dev-log/                      the original investigation, warts and all
 ```
