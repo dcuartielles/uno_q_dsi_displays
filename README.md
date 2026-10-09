@@ -671,6 +671,7 @@ tools/                        other generators and kernel-source patchers
 bench/                        reliability benchmark (camera + cold boots)
 bench/results/goodix/         what each panel's touch controller answers
 docs/                         adding a panel, how it works, troubleshooting
+docs/RETEST-CHECKLIST.md      putting panels back on a bench, and what is due
 dev-log/                      the original investigation, warts and all
 ```
 

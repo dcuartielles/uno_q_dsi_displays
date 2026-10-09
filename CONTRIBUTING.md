@@ -130,6 +130,17 @@ Which one you need is a property of your panel, not a preference. See
 Most new panels are **derived**, and most derived panels need a `.panel` file
 and no code at all - the last three did.
 
+## Keeping the recordings honest
+
+The replay above checks definitions against recorded dumps. It cannot check
+that a dump still describes the hardware - and where a probe's expected bytes
+were taken from its own dump, the check is comparing a value with its own
+source.
+
+So panels get put back on a bench periodically.
+[docs/RETEST-CHECKLIST.md](docs/RETEST-CHECKLIST.md) is the procedure, and
+carries whichever run is currently outstanding.
+
 ## Running the checks before you push
 
 All of these work on any machine, with no board attached:
