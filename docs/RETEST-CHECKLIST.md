@@ -99,9 +99,25 @@ from it.
 `tools/check-fingerprints.py` proves the definitions are **mutually consistent
 with the recorded dumps**. It cannot prove a dump still describes the hardware,
 and where a probe's expected bytes were taken **from its own dump**, the replay
-compares a value with its own source. CI stays green while a real panel fails.
+compares a value with its own source.
 
-That covers DETECT only. Nothing offline says anything about PICTURE or INPUT.
+**How much that actually matters, measured rather than assumed.** Every dump's
+`0x8048` decodes to that panel's real resolution - 720x1280, 1024x600,
+480x1920, and the 12.3 inch as 1920x720 transposed exactly as its file
+documents. Six independent confirmations that the register offsets are right;
+wrong offsets would decode to nonsense, not to six correct panel specs. And
+the probe mechanism itself has run on hardware this month at both addresses.
+
+So DETECT is in better shape than a bare "untested stage" suggests: the two
+outstanding stages use a register and length proven on other panels, and their
+expected bytes decode to the right resolutions. Treat those as confirmation
+rather than suspicion.
+
+What testing genuinely buys for DETECT is **recorded evidence in place of
+inference** - and the `0x45` recordings, which are the one thing nothing
+offline can stand in for.
+
+Nothing offline says anything at all about PICTURE or INPUT.
 
 ## What is in doubt, and where
 
