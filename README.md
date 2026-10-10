@@ -657,9 +657,12 @@ scripts/show-tunnel.sh        a rectangular tunnel; fills a wide panel's corners
 scripts/show-vaporwave.sh     the demo: grid, sun, ARDUINO, ships
 
                               -- contributing a panel --
+tools/new-panel.sh            interactive: set up an unknown panel, leave a PR
 tools/capture-panel.sh        collect everything a pull request needs, in one go
 tools/check-fingerprints.py   replay every panel against every definition (CI)
 tools/match-upstream.py       which upstream driver entry a panel might be
+tools/write-panel.py          assemble a .panel from measured facts
+lib/ask.sh                    prompts, for the one script that converses
 tools/goodix-config.sh        dump and diff a touch controller's config
 
 tools/panel-batch.sh          test a run of panels, one command each

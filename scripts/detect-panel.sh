@@ -400,7 +400,14 @@ case $# in
         fi
     fi
 
-    die "Run --scan to see what is on the bus, then see docs/ADDING-A-PANEL.md.
+    say "  If one of those looks like the panel you have, this will set it up"
+    say "  and leave a pull request behind - it measures the fingerprint off"
+    say "  the panel rather than guessing it:"
+    say ""
+    say "      sudo tools/new-panel.sh"
+    say ""
+
+    die "Or run --scan to see what is on the bus, and see docs/ADDING-A-PANEL.md.
     Do NOT install another panel's definition to see what happens: it
     describes different hardware, and at best nothing works."
     ;;

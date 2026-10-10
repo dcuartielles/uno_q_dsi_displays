@@ -15,6 +15,22 @@ in one command and checkable in one second.
 On the board, with the panel attached:
 
 ```bash
+sudo tools/new-panel.sh
+```
+
+That is a conversation, not a command. It works out which upstream panel you
+have, measures the fingerprint off your hardware, writes the definition,
+installs it, puts a moving pattern on the screen and asks you whether it looks
+right - then leaves a pull request ready to send. Two of those steps cannot be
+automated: which panel you bought, and whether the picture is correct.
+
+**Nothing is sent anywhere unless you say so.** The bundle contains your
+board's model, kernel and `dmesg`; review it first.
+
+If you would rather drive it yourself, the pieces underneath are all usable
+alone:
+
+```bash
 sudo tools/capture-panel.sh waveshare-5in5-touch-a
 ```
 

@@ -1,5 +1,64 @@
 # Changelog
 
+## 1.16.0 - 2026-10-10
+
+### `tools/new-panel.sh` - set up an unknown panel, and leave a pull request
+
+Ten of the seventeen Waveshare panels upstream have no definition here. They
+are not hard: the mode and the vendor initialisation sequence are already
+written. Somebody just has to put the panel on a bench, find out what its
+touch controller answers, and write it down.
+
+```bash
+sudo tools/new-panel.sh
+```
+
+A conversation rather than a command. It checks nothing here already matches,
+reads the digitizer resolution, works out which upstream entries fit, asks
+which panel you bought when more than one does, names it, measures the
+fingerprint, writes the definition, installs it, waits out a reboot, puts a
+moving pattern on the glass and asks whether it looked right - then assembles
+a pull request.
+
+**Nothing is sent anywhere unless you ask.** The bundle carries your board's
+model, kernel and `dmesg`, so it is yours to review first. If you say yes and
+`gh` is installed it opens the pull request; otherwise it prints what to send.
+
+### Why this works where "untested" definitions would not
+
+The previous release argued against shipping provisional definitions for the
+untested upstream panels, and that argument still holds: a definition needs a
+fingerprint, upstream describes displays and says nothing about touch
+controllers, so the fingerprint would be a guess - and most guesses would
+collide with panels that work today.
+
+This inverts it. **The panel is in front of you.** Its controller is on the
+bus. The mode is borrowed from upstream because no panel reports its own
+timings, but the fingerprint is *measured*, and the picture is confirmed by
+an eye. The definition is earned rather than assumed, which is the whole
+difference.
+
+### It refuses to install a definition that would collide
+
+Before anything is installed, the wizard runs the fingerprint replay against
+every panel recorded here. If the proposed chain would also match an existing
+panel, the definition is deleted and the run stops, because detection would
+then have to stop and ask about hardware it currently identifies correctly -
+and the person who discovers that is never the person who added it.
+
+Two panels that answer alike is a fact about the hardware worth reporting, so
+it says that rather than suggesting a workaround.
+
+### Also
+
+`detect-panel.sh` points at the wizard when it recognises nothing.
+`tools/write-panel.py` assembles the definition, marking every field MEASURED
+or ASSUMED - a generated file that reads as authoritatively as a hand-written
+one while standing on less is worse than no file. `lib/ask.sh` holds the
+prompts, deliberately out of `lib/common.sh`: every other script here must run
+unattended, and a helper that blocks on a human is the wrong thing to leave
+within reach of them.
+
 ## 1.15.1 - 2026-10-10
 
 ### Untested upstream panels are named, not silently absent
