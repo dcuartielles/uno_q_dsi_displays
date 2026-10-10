@@ -659,6 +659,7 @@ scripts/show-vaporwave.sh     the demo: grid, sun, ARDUINO, ships
                               -- contributing a panel --
 tools/capture-panel.sh        collect everything a pull request needs, in one go
 tools/check-fingerprints.py   replay every panel against every definition (CI)
+tools/match-upstream.py       which upstream driver entry a panel might be
 tools/goodix-config.sh        dump and diff a touch controller's config
 
 tools/panel-batch.sh          test a run of panels, one command each

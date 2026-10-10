@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.15.0 - 2026-10-10
+
+### Which upstream panel is this? - `tools/match-upstream.py`
+
+A DSI panel carries **no EDID**. Its timings, lane count, initialisation
+sequence and power ordering are not on it and never will be; no amount of
+probing produces them. What it does report is its digitizer resolution, and on
+every panel recorded here that equals the panel's own resolution - the 12.3
+inch transposed, which is handled.
+
+That number is worth something because Raspberry Pi's driver already holds the
+mode and the vendor initialisation sequence for seventeen Waveshare panels. So
+nothing needs deriving: the job is to work out *which* of the seventeen you are
+holding.
+
+```bash
+python3 tools/match-upstream.py bench/results/goodix/<panel>.txt
+python3 tools/match-upstream.py --resolution 1024x600
+python3 tools/match-upstream.py --list
+```
+
+**It settles five of the seven distinct resolutions outright** - 720x1920,
+480x1920, 1024x600, 720x720 and 800x800 each belong to exactly one entry. The
+other two are traps, and the tool says so rather than guessing:
+
+| Reported | Candidates |
+| --- | --- |
+| 800x1280 | 4 entries, 2 or 4 lanes |
+| 720x1280 | 8 entries, 65 to 83.3 MHz |
+
+Neither clock nor lane count is readable from the panel, so the digitizer
+cannot separate those. Choosing wrong gives a connected connector, the right
+driver, a clean `dmesg` and a garbled picture - the failure met most often
+here, which is why this refuses to pick.
+
+When nothing matches it says that too, as an answer rather than an error: the
+panel is not in that driver, and the timings have to come from the vendor's
+own sources. A 6 inch panel is in that position today - there is no 6 inch
+entry upstream.
+
+Checked against every recorded panel: the three with unique resolutions
+resolve to exactly the compatible this repository already uses, and the 12.3
+inch is matched through its transposed digitizer with a note that this is why
+it needs `TOUCH_SWAP_XY=1`. Stock panels are annotated too, since they carry
+no upstream compatible to match on and would otherwise look absent.
+
+`capture-panel.sh` runs it after the fingerprint proposal, so a contributor
+gets both answers: how to recognise the panel, and what might drive it.
+
 ## 1.14.1 - 2026-10-09
 
 ### Fixed: three faults found the first time capture-panel.sh was actually run

@@ -193,6 +193,16 @@ if [ -n "$DUMP" ]; then
         --suggest "$DUMP" | tee "$OUT/fingerprint.txt" || true
 fi
 
+# ------------------------------------------- which upstream panel is this ---
+# The fingerprint above says how to RECOGNISE this panel. This says which
+# upstream driver entry might DRIVE it - a different question, answered from
+# the digitizer resolution, because a DSI panel carries no EDID and the
+# timings are not on it to be read.
+if [ -n "$DUMP" ]; then
+    step "Matching against the upstream driver"
+    python3 "$HERE/tools/match-upstream.py" "$DUMP"         2>&1 | tee "$OUT/upstream.txt" || true
+fi
+
 # -------------------------------------------------------------- the draft ---
 DRAFT="$OUT/DRAFT.panel"
 if [ ! -f "$DRAFT" ]; then

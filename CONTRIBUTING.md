@@ -63,6 +63,37 @@ direction.
 The bargain is mutual: **contribute the dump, and nobody can add a panel after
 yours that breaks yours without CI noticing.**
 
+## Which upstream entry is your panel?
+
+A DSI panel carries **no EDID**. Its timings, lane count and initialisation
+sequence are not on it and never will be - no amount of probing produces them.
+
+What it does tell you is its digitizer resolution, and Raspberry Pi's driver
+already holds the mode and init sequence for seventeen Waveshare panels. So
+the job is to work out *which* of those you are holding:
+
+```bash
+python3 tools/match-upstream.py submissions/<id>/goodix-0x5d.txt
+python3 tools/match-upstream.py --list        # the whole table
+```
+
+Resolution settles it for five of the seven distinct resolutions upstream. The
+other two do not:
+
+| Reported | Candidates |
+| --- | --- |
+| 800x1280 | 4 entries, 2 or 4 lanes |
+| 720x1280 | 8 entries, 65 to 83.3 MHz |
+
+The tool will not choose for you there, deliberately. Picking wrong gives a
+connected connector, the right driver, a clean `dmesg` and a garbled picture -
+the failure this repository has met most often. Go by what the panel is sold
+as, then **look at the screen**.
+
+If nothing matches, your panel is not in that driver and the timings have to
+come from the vendor's own sources - Waveshare publish per-panel drivers. That
+is the *described* path.
+
 ## What the pull request must contain
 
 1. **`panels/<name>.panel`** - the definition.
