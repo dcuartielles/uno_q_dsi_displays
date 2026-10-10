@@ -205,36 +205,70 @@ and why the tool stops and asks rather than following a branch.
 
 ### What the bytes say
 
-```
-0x45   REG_ID (0x80)
-  |
-  +-- c3 or de ....... waveshare-800x480
-  |                    (4.3in + 5in, LCD line)
-  +-- anything else .. not the LCD line
+Every comparison below is of raw bytes read from a register. The decoded
+meaning is shown next to it, but the decoding is for you, not for the tool.
 
-
-0x5d   product ID (0x8140)
-  |
-  +-- "911" --> 0x8048 resolution
-  |      |
-  |      +-- 720 x 1280 ... arduino-5in-touch-a
-  |      +-- 1024 x 600 ... waveshare-7in-touch-c
-  |
-  +-- "9271" --> 0x8053 thresholds
-         |
-         +-- 5f 41 ....... arduino-8in-touch-a
-         +-- 64 32 ....... arduino-12in-touch-a
-         +-- 64 46 ....... waveshare-4in-touch-c
-         |
-         +-- 50 32 ....... AMBIGUOUS, needs one more
-                |
-                +-- 0x8048 resolution
-                       |
-                       +-- 800 x 1280 ...
-                       |     arduino-10in-touch-a
-                       +-- 480 x 1920 ...
-                             waveshare-8in8-touch-a
 ```
+0x45   REG_ID (0x80), 1 byte
+  |
+  +-- c3  -> waveshare-800x480
+  +-- de  -> waveshare-800x480   (the SAME definition)
+  |
+  |     c3 and de are ATTINY FIRMWARE REVISIONS,
+  |     not panel sizes. The 4.3in and 5in LCD are
+  |     electrically one panel - same timings, same
+  |     single lane, same bridge - and nothing on
+  |     this bus tells them apart. One definition
+  |     covers both, deliberately.
+  |     Only c3 has been seen on hardware here;
+  |     de comes from the driver source.
+  |
+  +-- 01 or ff  -> a TOUCH-line panel's chip,
+                   which also lives at 0x45.
+                   Neither collides with c3/de.
+```
+
+```
+0x5d   product ID (0x8140), 4 bytes, ASCII
+  |
+  +-- 39 31 31 = "911"
+  |    |
+  |    +-- 0x8048 touch resolution (4 bytes)
+  |         |
+  |         +-- d0 02 00 05  = 720 x 1280
+  |         |      -> arduino-5in-touch-a
+  |         |
+  |         +-- 00 04 58 02  = 1024 x 600
+  |                -> waveshare-7in-touch-c
+  |
+  +-- 39 32 37 31 = "9271"
+       |
+       +-- 0x8053 thresholds (2 bytes)
+            |
+            +-- 5f 41  -> arduino-8in-touch-a
+            +-- 64 32  -> arduino-12in-touch-a
+            +-- 64 46  -> waveshare-4in-touch-c
+            |
+            +-- 50 32  AMBIGUOUS: two panels
+                 |      share this value
+                 |
+                 +-- 0x8048 resolution (4 bytes)
+                      |
+                      +-- 20 03 00 05 = 800 x 1280
+                      |      -> arduino-10in-touch-a
+                      |
+                      +-- e0 01 80 07 = 480 x 1920
+                             -> waveshare-8in8-touch-a
+```
+
+Note the two kinds of "cannot tell apart", because they are not the same
+problem:
+
+- the **4.3in and 5in LCD** are one electrical panel, so there is nothing to
+  separate and one definition is the correct answer rather than a shortcut;
+- the **8in and 10.1in** are genuinely different panels needing different
+  overlays, and the two threshold bytes are the only thing that separates
+  them.
 
 Three things the shape tells you.
 
