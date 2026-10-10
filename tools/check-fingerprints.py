@@ -88,14 +88,45 @@ def load_dump(path):
     return d
 
 
-def read_dump(dump, addr, write, nbytes):
-    """What this dump would answer. None when the dump cannot say.
+def merge_dumps(records):
+    """Group controller dumps into panels.
+
+    A panel is several chips on one bus - a Goodix at 0x5d and a GPIO chip at
+    0x45, or an ATTINY at 0x45 and an FT5x06 at 0x38 - and a fingerprint may
+    read any of them. One file per controller, grouped by the panel name they
+    share.
+    """
+    panels = {}
+    for r in records:
+        if r["addr"] is None:
+            continue
+        p = panels.setdefault(r["name"], {"name": r["name"], "ctrl": {}})
+        p["ctrl"][r["addr"]] = {"id": r["id"], "regs": r["regs"],
+                                "path": r["path"]}
+    return [panels[k] for k in sorted(panels)]
+
+
+def addresses(panel):
+    return sorted(panel["ctrl"])
+
+
+def read_dump(panel, addr, write, nbytes):
+    """What this panel would answer. None when the record cannot say.
 
     Being explicit about "cannot say" is the point: a definition probing an
     address or a register nobody recorded must not be scored as a pass.
     """
-    if addr is not None and dump["addr"] is not None and addr != dump["addr"]:
-        return None
+    if addr is None:
+        # No address given: only answerable if this panel has exactly one
+        # controller on file, otherwise there is nothing to pick between.
+        if len(panel["ctrl"]) != 1:
+            return None
+        ctrl = next(iter(panel["ctrl"].values()))
+    else:
+        ctrl = panel["ctrl"].get(addr)
+        if ctrl is None:
+            return None
+    dump = ctrl
     if not write:
         return None                      # a plain read, not recorded
     if len(write) == 2:
@@ -223,8 +254,10 @@ def replay(panels, dumps, verbose=False):
                 unsure.append(p["id"])
 
         if verbose:
-            print("  %-26s matched: %s%s"
-                  % (d["name"], ", ".join(matched) or "NOTHING",
+            print("  %-26s [%s] matched: %s%s"
+                  % (d["name"],
+                     " ".join("0x%02x" % a for a in addresses(d)),
+                     ", ".join(matched) or "NOTHING",
                      ("   (unverifiable: %s)" % ", ".join(unsure)) if unsure else ""))
 
         if d["name"] not in matched:
@@ -264,22 +297,26 @@ def candidates_for(dump):
     used in address order - with the caveat printed, because this tool cannot
     tell an identity register from live pin state.
     """
-    if dump["addr"] == 0x5D:
+    here = addresses(dump)[0] if addresses(dump) else None
+    if here == 0x5D:
         return CANDIDATES, True
-    return [("register 0x%02x" % r, r, 1)
-            for r in sorted(dump["regs"])], False
+    regs = dump["ctrl"].get(here, {}).get("regs", {})
+    return [("register 0x%02x" % r, r, 1) for r in sorted(regs)], False
 
 
 def suggest(dump, others):
     """Propose the shortest chain that separates this panel from every other."""
-    print("Dump: %s  (controller at 0x%02x)" % (dump["name"], dump["addr"] or 0))
+    print("Dump: %s  (controllers at %s)"
+          % (dump["name"],
+             ", ".join("0x%02x" % a for a in addresses(dump)) or "none"))
 
     # Only panels recorded at the SAME address can be compared. Nobody
     # recorded what a Goodix panel answers at 0x45, or an ATTINY panel at
     # 0x5d, so those comparisons have no evidence either way - and reporting
     # them as "ambiguous" would be inventing a finding.
-    comparable = [o for o in others if o["addr"] == dump["addr"]]
-    skipped = [o["name"] for o in others if o["addr"] != dump["addr"]]
+    here = addresses(dump)[0] if addresses(dump) else None
+    comparable = [o for o in others if here in o["ctrl"]]
+    skipped = [o["name"] for o in others if here not in o["ctrl"]]
     if skipped:
         print("Not compared (recorded at a different address): %s"
               % ", ".join(sorted(skipped)))
@@ -287,12 +324,13 @@ def suggest(dump, others):
 
     if not comparable:
         print("No other panel has a recorded signature at 0x%02x, so there is"
-              % (dump["addr"] or 0))
+              % (here or 0))
         print("nothing here to collide with yet - yours would be the first.")
         print("")
         print("Registers your controller answered:")
-        for r in sorted(dump["regs"]):
-            print("    0x%02x -> 0x%02x" % (r, dump["regs"][r]))
+        regs = dump["ctrl"].get(here, {}).get("regs", {})
+        for r in sorted(regs):
+            print("    0x%02x -> 0x%02x" % (r, regs[r]))
         print("")
         print("Pick one that identifies the HARDWARE. A part number or ID")
         print("register is right; anything that reflects live pin state or")
@@ -311,7 +349,7 @@ def suggest(dump, others):
     chosen, excluded = [], set()
     for label, reg, n in cand:
         write = [reg >> 8, reg & 0xFF]
-        mine = read_dump(dump, dump["addr"], write, n)
+        mine = read_dump(dump, here, write, n)
         if mine is None:
             continue
 
@@ -319,7 +357,7 @@ def suggest(dump, others):
         for o in comparable:
             if o["name"] in excluded:
                 continue
-            theirs = read_dump(o, o["addr"], write, n)
+            theirs = read_dump(o, here, write, n)
             if theirs is None or theirs != mine:
                 newly.add(o["name"])
 
@@ -388,10 +426,10 @@ def main(argv):
     # holds benchmark logs too - so it is skipped rather than misread.
     found = sorted(glob.glob(os.path.join(a.dumps, "*.txt"))
                    + glob.glob(os.path.join(a.dumps, "*", "*.txt")))
-    dumps = [d for d in (load_dump(p) for p in found) if d["addr"] is not None]
+    dumps = merge_dumps(load_dump(p) for p in found)
 
     if a.suggest:
-        mine = load_dump(a.suggest)
+        mine = merge_dumps([load_dump(a.suggest)])[0]
         others = [d for d in dumps if d["name"] != mine["name"]]
         if not others:
             print("no other dumps to compare against")

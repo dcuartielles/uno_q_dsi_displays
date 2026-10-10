@@ -109,31 +109,38 @@ else
     say "  no Goodix at 0x5d"
 fi
 
-# Whatever else is on the bus. A panel with a different controller still needs
-# a signature, and the Raspberry Pi style ATTINY is the other one seen here.
+# ALWAYS, even when a Goodix was found. Both product lines have a chip at
+# 0x45, so a Goodix panel's 0x45 contents are what prove it is not mistaken
+# for an LCD-line panel - and without them that pairing cannot be checked in
+# either direction.
 if i2ctransfer -y -f "$(cat "$OUT/.bus" 2>/dev/null || echo 2)" w1@0x45 0x80 r1 >/dev/null 2>&1; then
     {
-        echo "# rpi-style panel ATTINY config block"
+        echo "# panel controller at 0x45"
         echo "# addr=0x45 first=0x80 count=16"
         echo "# kernel=$(uname -r)"
         echo "#"
-        echo "# Only REG_ID (0x80) is identity. 0x81-0x83 are PORTA/PORTB/PORTC,"
-        echo "# live pin state that changes with what the driver has done, so a"
-        echo "# fingerprint built on them would drift."
+        echo "# BOTH product lines put something here, and they are different"
+        echo "# parts: an RPi-style ATTINY on the DSI LCD line, a Waveshare GPIO"
+        echo "# chip on the DSI-TOUCH lines. So the address proves nothing and"
+        echo "# the CONTENTS are the whole signature - which is also why this is"
+        echo "# worth capturing even on a panel detected via its Goodix."
+        echo "#"
+        echo "# On the ATTINY only REG_ID (0x80) is identity: 0x81-0x83 are"
+        echo "# PORTA/PORTB/PORTC, live pin state that drifts."
         for r in 80 81 82 83 84 85 86 87 88 89 8a 8b 8c 8d 8e 8f; do
             v=$(i2ctransfer -y -f "$(cat "$OUT/.bus" 2>/dev/null || echo 2)" \
                     w1@0x45 "0x$r" r1 2>/dev/null)
             printf '00%s: %s\n' "$r" "${v:-unreadable}"
         done
-    } > "$OUT/attiny-0x45.txt"
-    if has_data "$OUT/attiny-0x45.txt"; then
-        ok "attiny-0x45.txt"
+    } > "$OUT/ctrl-0x45.txt"
+    if has_data "$OUT/ctrl-0x45.txt"; then
+        ok "ctrl-0x45.txt"
         if [ -z "$DUMP" ]; then
-            DUMP="$OUT/attiny-0x45.txt"
-            DUMP_KIND=attiny
+            DUMP="$OUT/ctrl-0x45.txt"
+            DUMP_KIND=addr-0x45
         fi
     else
-        rm -f "$OUT/attiny-0x45.txt"
+        rm -f "$OUT/ctrl-0x45.txt"
     fi
 fi
 
