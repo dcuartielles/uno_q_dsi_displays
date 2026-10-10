@@ -4,20 +4,62 @@ What still needs putting on a bench, broken down by **which part** of each
 panel is in doubt - because "re-test the 10.1 inch" is not an instruction
 anybody can act on.
 
-## Three things, and they fail independently
+## The panels, and which line they belong to
 
-A panel is three subsystems that break in different ways, are fixed by
-different code, and need different evidence:
+Waveshare sells two lines, and the difference is the wiring:
 
-| | What it is | What proves it | What breaks it |
-| --- | --- | --- | --- |
-| **LCD** | the picture | an eye on a moving pattern | panel driver, timings, overlay, the install path |
-| **DETECT** | the I2C fingerprint that identifies the panel | `detect-panel.sh` picking exactly one, and a fresh dump matching the recorded one | the `DETECT_*` fields, `detect-panel.sh` |
-| **TOUCH** | the digitizer actually working, the right way round | a finger, and coordinates that land where you pressed | the touch driver patches, `TOUCH_SWAP_XY` / `INVERT_*` |
+| Line | Connection | Consequence |
+| --- | --- | --- |
+| **DSI LCD** | the wide-narrow DSI flex alone, power drawn through it | cannot carry a large panel, so the line stops at small sizes |
+| **DSI-TOUCH-A / -C** | a pure DSI connector **plus its own 5V lead** | can drive large panels |
 
-A panel can have a perfect picture and dead touch. It can have working touch
-mapped backwards. It can be detected as something else entirely and still light
-up. These are not one test.
+Both lines have a touchscreen. They differ in how they are wired and powered,
+not in whether you can touch them.
+
+### What this repository supports
+
+Read from the panel definitions. "not recorded" means the file does not say -
+not that the answer is no.
+
+| Panel | Line | Resolution | DSI lanes | Touch controller | Detected via | Own 5V lead |
+| --- | --- | --- | --- | --- | --- | --- |
+| Waveshare 4.3inch + 5inch | **LCD** | 800×480 | 1 | FT5x06 @ `0x38` | ATTINY @ `0x45` | no - powered over the flex |
+| Waveshare 4.0inch C | TOUCH-C | 720×720 *(round)* | 2 | Goodix GT9271 @ `0x5d` | same chip | not recorded |
+| Waveshare 7.0inch C | TOUCH-C | 1024×600 | 2 | Goodix GT911 @ `0x5d` | same chip | not recorded |
+| Arduino 5inch | TOUCH-A | 720×1280 | not recorded | Goodix GT911 @ `0x5d` | same chip | not recorded |
+| Arduino 8inch | TOUCH-A | 800×1280 | not recorded | Goodix GT9271 @ `0x5d` | same chip | not recorded |
+| Waveshare 8.8inch | TOUCH-A | 480×1920 | 2 | Goodix GT9271 @ `0x5d` | same chip | not recorded |
+| Arduino 10.1inch | TOUCH-A | 800×1280 | not recorded | Goodix GT9271 @ `0x5d` | same chip | not recorded |
+| Arduino 12.3inch | TOUCH-A | 720×1920 | 4 | Goodix GT9271 @ `0x5d` | same chip | **yes** - 5V at 1A or more, documented |
+
+The 12.3 inch is the only panel whose power lead is written down, and it is
+there because a faulty one cost most of an afternoon looking like a software
+fault. The others are presumably the same by line, but presumably is not
+recorded - worth filling in as panels come back to a bench.
+
+Note the two detection arrangements. On the LCD line the fingerprint reads the
+**ATTINY at 0x45**, not the touch controller, because the FT5x06 is held in
+reset until a driver releases it - it is silent exactly when detection needs
+it. On the TOUCH line the Goodix answers for itself.
+
+### Coverage by size
+
+We do not have both lines at any size except 5 inch:
+
+| Size | LCD | TOUCH |
+| --- | :-: | :-: |
+| 4.0in | — | ✅ C |
+| 4.3in | ✅ | — |
+| 5in | ✅ | ✅ A |
+| 7.0in | — | ✅ C |
+| 8.0in | — | ✅ A |
+| 8.8in | — | ✅ A |
+| 10.1in | — | ✅ A |
+| 12.3in | — | ✅ A |
+
+So any claim of the form "the LCD line behaves like this" rests on one
+definition covering two physical panels. Worth remembering before generalising
+from it.
 
 ## Why a bench is needed at all
 
@@ -26,24 +68,31 @@ with the recorded dumps**. It cannot prove a dump still describes the hardware,
 and where a probe's expected bytes were taken **from its own dump**, the replay
 compares a value with its own source. CI stays green while a real panel fails.
 
-That covers DETECT only. Nothing offline says anything at all about LCD or
-TOUCH.
+That covers DETECT only. Nothing offline says anything about PICTURE or INPUT.
 
-## What needs what
+## What is in doubt, and where
 
-Bench date = the last time that physical panel was verified. Compared against
-when each subsystem's code last changed.
+Three things get tested, and they fail independently. These are **not** the
+product lines - every panel has all three:
 
-| Panel | Bench | LCD | DETECT | TOUCH |
-| --- | --- | :-: | :-: | :-: |
-| Arduino 5inch | 09-09 | ✅ | 🟠 | ✅ |
-| Arduino 8inch | 09-08 | 🟡 | 🟡 | 🟠 |
-| Arduino 10.1inch | 09-08 | 🟡 | 🟠 | 🟠 |
-| Arduino 12.3inch | 09-09 | 🟠 | 🟡 | ✅ |
-| Waveshare 4.0inch C | 09-15 | ✅ | 🔴 | 🟠 |
-| Waveshare 7.0inch C | 09-15 | ✅ | ✅ | 🟡 |
-| Waveshare 800×480 | 10-09 | ✅ | ✅ | 🟡 |
-| Waveshare 8.8inch | 09-16 | ✅ | ✅ | 🟡 |
+| | What it is | What proves it |
+| --- | --- | --- |
+| **PICTURE** | the image is right | an eye on a moving pattern |
+| **DETECT** | the fingerprint identifies this panel and no other | one match, and a fresh dump matching the recorded one |
+| **INPUT** | the digitizer works, the right way round | a finger, and coordinates landing where you pressed |
+
+Bench date = the last time that physical panel was verified.
+
+| Panel | Line | Bench | PICTURE | DETECT | INPUT |
+| --- | --- | --- | :-: | :-: | :-: |
+| Waveshare 4.3/5inch | LCD | 10-09 | ✅ | ✅ | 🟡 |
+| Waveshare 4.0inch C | TOUCH-C | 09-15 | ✅ | 🔴 | 🟠 |
+| Waveshare 7.0inch C | TOUCH-C | 09-15 | ✅ | ✅ | 🟡 |
+| Arduino 5inch | TOUCH-A | 09-09 | ✅ | 🟠 | ✅ |
+| Arduino 8inch | TOUCH-A | 09-08 | 🟡 | 🟡 | 🟠 |
+| Waveshare 8.8inch | TOUCH-A | 09-16 | ✅ | ✅ | 🟡 |
+| Arduino 10.1inch | TOUCH-A | 09-08 | 🟡 | 🟠 | 🟠 |
+| Arduino 12.3inch | TOUCH-A | 09-09 | 🟠 | 🟡 | ✅ |
 
 🔴 never verified · 🟠 verified, then the code under it changed · 🟡 verified,
 but indirectly or long ago · ✅ current
@@ -52,56 +101,38 @@ Record disputed? Say so in the Results table and correct the panel file. A
 bench date nobody wrote down is worth less than a memory, but both are worth
 less than a finger on the glass today.
 
-### The two that matter most
+### The one genuine red
 
-**🟠 The 8 inch and 10.1 inch have never had touch verified against the driver
-they would run today.** Both were benched on 09-08; the Goodix 12-byte read
-fix landed on 09-09.
-
-There is a disagreement in the record here, and it is worth stating rather than
-resolving by assertion. The 1.8.0 changelog says touch on the 5, 8 and 10.1
-inch was *"checked for the presence of an input device"* rather than by a
-finger, and asserts the fault *"affects the 5, 8 and 10.1 inch too"* - but that
-assertion is an inference from the shared controller and the shared 12-byte
-ceiling, not a measurement on those panels. dcuartielles recalls testing touch
-on every panel.
-
-Both readings leave the same gap, which is why it does not need settling first:
-
-- if touch was broken then, it has never been seen working;
-- if touch worked then, it worked with the **unpatched** driver, and since
-  09-09 these panels would run `goodix_ts` with reads split into 12-byte
-  chunks - code they have never run.
-
-Thirty seconds with a finger settles it, and also corrects the record.
-
-**🔴 The 4.0 inch C has no recorded signature.** The only definition never
-replayed against real hardware. Its touch orientation is also marked unverified
-in the panel file - it is square, so the axes cannot be deduced from the
-reported extents the way they can on a tall panel.
+**The 4.0 inch C has no recorded signature.** The only definition never
+replayed against real hardware - a file that does not exist, not an inference.
+Its touch orientation is also marked unverified in the panel file: it is
+square, so the axes cannot be deduced from the reported extents.
 
 ### The rest, briefly
 
 - **🟠 5 inch and 10.1 inch DETECT** - each gained a probe stage (09-15, 09-16)
-  *after* that panel was last on a bench. Those stages have never been answered
-  by real hardware.
-- **🟠 12.3 inch LCD** - the derived install path changed on 09-15 (the private
-  `unoq,` compatible, and the generic patcher replacing the 12.3-specific one).
-  The panel has not been installed with that code.
-- **🟠 4.0 inch TOUCH** - orientation unverified, see above.
-- **🟡 8 inch / 10.1 inch LCD** - the stock install path changed on 09-09,
-  after their bench. Probably benign, cheap to confirm while they are out.
-- **🟡 7.0 / 8.8 inch TOUCH** - touch confirmed with a finger, but orientation
-  was *deduced* from the reported extents rather than checked by pointing.
-- **🟡 800×480 TOUCH** - the device appeared on 10-09 but the run was cut short
+  *after* that panel was last on a bench. Never answered by real hardware.
+- **🟠 12.3 inch PICTURE** - the derived install path changed on 09-15 (the
+  private `unoq,` compatible, the generic patcher). Not installed with it since.
+- **🟠 8 inch and 10.1 inch INPUT** - neither has run the *patched* `goodix_ts`,
+  whose reads are split into 12-byte chunks for the CCI controller. The 1.8.0
+  changelog claims touch was broken on them before that patch, but that claim
+  is an inference from the shared controller rather than a measurement, and
+  dcuartielles recalls testing touch on every panel. Either way the patched
+  driver is code those panels have not run.
+- **🟠 4.0 inch INPUT** - orientation unverified, see above.
+- **🟡 8 inch / 10.1 inch PICTURE** - the stock install path changed 09-09,
+  after their bench. Probably benign, cheap while they are out.
+- **🟡 7.0 / 8.8 inch INPUT** - touch confirmed by finger, but orientation
+  *deduced* from reported extents rather than checked by pointing.
+- **🟡 4.3/5inch LCD INPUT** - the device appeared on 10-09 but the run ended
   before a finger confirmed it.
 - **🟡 every panel's DETECT** - `detect-panel.sh` gained the stuck-bus guard on
-  10-08. It has run cleanly on the 800×480 since, and nowhere else. It rides
-  along free with any DETECT test below.
+  10-08, run cleanly on the LCD panel since and nowhere else. Rides along free.
 
 ## The three tests
 
-### LCD
+### PICTURE
 
 ```bash
 sudo ./scripts/detect-panel.sh --apply
@@ -134,7 +165,7 @@ tools/goodix-config.sh diff bench/results/goodix/<panel-id>.txt \
       understood and written down
 - [ ] the stuck-bus guard did not fire on a healthy bus
 
-### TOUCH
+### INPUT
 
 Function first, then orientation - they are different questions.
 
@@ -156,14 +187,14 @@ square panel the extents cannot tell you - only pointing can.
 
 Four panels, about an hour, highest value first.
 
-1. **10.1 inch** - 🟠 touch, 🟠 detect, 🟡 lcd. All three in one swap.
+1. **10.1 inch** - 🟠 input, 🟠 detect, 🟡 picture. All three in one swap.
 2. **8 inch** - 🟠 touch, 🟡 the rest. Do it straight after: its thresholds are
    the only thing separating it from the 10.1 inch, so confirm that too.
-3. **4.0 inch C** - 🔴 detect, 🟠 touch orientation. Also the only way to
+3. **4.0 inch C** - 🔴 detect, 🟠 input orientation. Also the only way to
    exercise the Goodix branch of `capture-panel.sh`, untested since 1.14.1.
 4. **5 inch** - 🟠 detect only. Quick.
 
-Then if there is appetite: **12.3 inch** for its 🟠 LCD install path.
+Then if there is appetite: **12.3 inch** for its 🟠 install path.
 
 ## Afterwards
 
@@ -189,7 +220,7 @@ confirmed against hardware is worth more than the date on the old one.
 
 ## Results
 
-| Panel | Date | LCD | DETECT | TOUCH | Notes |
+| Panel | Date | PICTURE | DETECT | INPUT | Notes |
 | --- | --- | --- | --- | --- | --- |
 | arduino-10in-touch-a | | | | | |
 | arduino-8in-touch-a | | | | | |
