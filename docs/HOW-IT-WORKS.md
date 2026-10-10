@@ -165,6 +165,96 @@ cycle. Better power makes the bad case markedly rarer.
 
 ---
 
+## How a panel is identified
+
+It is worth being clear about what this is **not**: there is no tree walk. Every
+panel definition is an independent predicate, run against the bus on its own,
+and the rule is that **exactly one** must match. The tree below is the shape the
+*data* happens to form - which is precisely why collisions are possible at all,
+and why the tool stops and asks rather than following a branch.
+
+### The run
+
+```
+   sudo ./scripts/detect-panel.sh
+               |
+               v
+   +-------------------------+   numbering is not stable across boots,
+   |  find the carrier's bus |   so it is found, never assumed
+   +-----------+-------------+
+               v
+   +-------------------------+   probe 12 addresses no panel uses
+   |  is the bus stuck low?  |-- all answer --> STOP
+   +-----------+-------------+                  "THE I2C BUS IS NOT WORKING"
+               | healthy                        power / cable / connector
+               v
+   +-----------------------------------------------+
+   | run EVERY definition's probe chain, separately |
+   |   - every stage must match                     |
+   |   - prefix compare; "|" means alternatives     |
+   +-----------+-----------------------------------+
+               v
+         how many matched?
+               |
+      +--------+---------+----------------+
+      0                  1               2 or more
+      |                  |                |
+    STOP              install         STOP and ask
+  "no known panel"                  (they are not interchangeable,
+                                     so guessing is 50/50 wrong)
+```
+
+### What the bytes say
+
+```
+                      WHICH CHIP ANSWERS?
+                              |
+          +-------------------+--------------------+
+          |                                        |
+   0x45 REG_ID (0x80)                   0x5d product ID (0x8140)
+          |                                        |
+      c3 or de                      +--------------+--------------+
+          |                         |                             |
+  waveshare-800x480              "911"                         "9271"
+  (4.3in + 5in, LCD line)           |                             |
+                           0x8048 resolution            0x8053 thresholds
+                                    |                             |
+                        +-----------+--------+        +------+----+----+------+
+                        |                    |        |      |         |      |
+                   720 x 1280          1024 x 600   5f 41  50 32     64 32  64 46
+                        |                    |        |      |         |      |
+                  arduino-5in        waveshare-7in   8in   AMBIGUOUS  12.3in 4.0in C
+                   (TOUCH-A)           (TOUCH-C)  (TOUCH-A)   |      (TOUCH-A)(TOUCH-C)
+                                                              |
+                                                     0x8048 resolution
+                                                              |
+                                                  +-----------+-----------+
+                                                  |                       |
+                                             800 x 1280             480 x 1920
+                                                  |                       |
+                                           arduino-10in           waveshare-8in8
+                                             (TOUCH-A)              (TOUCH-A)
+```
+
+Three things the shape tells you.
+
+**Depth is forced, not chosen.** The 10.1 inch and 8.8 inch need three stages
+because they agree on *both* the product ID and the thresholds. The 8 inch
+needs two. Every stage exists to exclude something specific, which is why a
+stage that excludes nothing only adds a way to fail.
+
+**The two branches never meet, and that is a blind spot.** `0x45` and `0x5d`
+look like separate subtrees here, but every TOUCH panel *also* carries a chip
+at `0x45`. Nothing recorded says what it answers, so the left branch has never
+been tested against a TOUCH panel in either direction. See
+[RETEST-CHECKLIST.md](RETEST-CHECKLIST.md).
+
+**The `50 32` node is where a panel got misidentified.** Before 1.13.0 it had
+no third level, so the 8.8 inch fell straight through to
+`arduino-10in-touch-a` - confidently, and wrongly. `tools/check-fingerprints.py`
+exists to catch that shape of fault without hardware.
+
+
 ## Why the 5-inch slot gets reused
 
 `arduino-linux-config` is a Go binary with its carrier definitions compiled in —
