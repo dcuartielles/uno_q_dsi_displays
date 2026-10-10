@@ -42,6 +42,39 @@ Note the two detection arrangements. On the LCD line the fingerprint reads the
 reset until a driver releases it - it is silent exactly when detection needs
 it. On the TOUCH line the Goodix answers for itself.
 
+### Which chips we hold signatures for
+
+Detection can only be checked against chips somebody recorded. This is the
+state of that evidence:
+
+| Chip | On | Signatures held |
+| --- | --- | --- |
+| Goodix @ `0x5d` | every TOUCH panel | **6 of 7** - the 4.0 inch C is missing |
+| ATTINY @ `0x45` | LCD line | 1 of 1 |
+| GPIO chip @ `0x45` | **every TOUCH panel** | **0 of 7** |
+| FT5x06 @ `0x38` | LCD line | 0 - and deliberately so |
+
+**The third row is a blind spot.** The LCD definition probes `0x45` expecting
+`c3|de`, and every TOUCH panel has a chip at `0x45` too - a Waveshare GPIO
+chip rather than an ATTINY, but at the same address. `docs/ADDING-A-PANEL.md`
+says it plainly: *"both panels shipped here occupy 0x45, so for them the
+address proves nothing"*.
+
+`check-fingerprints.py` compares only panels recorded at the same address, so
+today it proves the seven TOUCH panels do not collide **with each other**, and
+proves **nothing** about LCD against TOUCH in either direction. One direction
+has been seen by eye - the 4.3 inch answered nothing at `0x5d` on 10-09, so
+the Goodix definitions reject it - but that was observed, not recorded.
+
+Capturing `0x45` on each TOUCH panel closes it. `capture-panel.sh` now does
+that on every panel, and a panel record can hold several controllers, so the
+dump has somewhere to live. **Do it at every bench visit below.**
+
+The FT5x06 row is not a gap: detection deliberately never reads it, because it
+is held in reset until a driver releases it and is silent exactly when
+detection needs it. That is why the LCD line is fingerprinted via its ATTINY.
+
+
 ### Coverage by size
 
 We do not have both lines at any size except 5 inch:
@@ -159,11 +192,25 @@ tools/goodix-config.sh diff bench/results/goodix/<panel-id>.txt \
                             submissions/<panel-id>/goodix-0x5d.txt
 ```
 
+`capture-panel.sh` writes **both** controllers - `goodix-0x5d.txt` and
+`ctrl-0x45.txt`. Keep both:
+
+```bash
+cp submissions/<id>/goodix-0x5d.txt bench/results/goodix/<id>.txt
+mkdir -p bench/results/addr-0x45
+cp submissions/<id>/ctrl-0x45.txt   bench/results/addr-0x45/<id>.txt
+```
+
+The second one is what lets the LCD definition be checked against this panel
+at all.
+
+
 - [ ] **exactly one** match, and it is the right panel
 - [ ] every other definition rejected **with a reason**, not silently
 - [ ] the fresh dump is identical to the recorded one, or the difference is
       understood and written down
 - [ ] the stuck-bus guard did not fire on a healthy bus
+- [ ] **`0x45` captured** - the one that closes the LCD/TOUCH blind spot
 
 ### INPUT
 
