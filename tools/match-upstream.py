@@ -128,7 +128,14 @@ def digitizer_resolution(dump):
 
 
 def ours_by_compatible(compat):
-    """Does this repository already drive that entry?"""
+    """Is this entry covered here, and how?
+
+    Two ways it can be. A derived panel installs the upstream driver and names
+    the entry in PANEL_DT_COMPATIBLE. A stock panel is driven by the kernel's
+    own driver and names the same hardware in UPSTREAM_COMPATIBLE, which is
+    informational - without reading it, a tested 8 inch looks untried because
+    its definition never mentions the upstream entry.
+    """
     for f in sorted(os.listdir(os.path.join(ROOT, "panels"))):
         if not f.endswith(".panel") or "TEMPLATE" in f:
             continue
@@ -136,7 +143,10 @@ def ours_by_compatible(compat):
                       encoding="utf-8").read()
         m = re.search(r'^PANEL_DT_COMPATIBLE="([^"]+)"', txt, re.M)
         if m and m.group(1) == compat:
-            return f[:-6]
+            return (f[:-6], "driven by this entry")
+        m = re.search(r'^UPSTREAM_COMPATIBLE="([^"]+)"', txt, re.M)
+        if m and m.group(1) == compat:
+            return (f[:-6], "same panel, driven by the kernel")
     return None
 
 
@@ -192,13 +202,31 @@ def main(argv):
 
     if a.list:
         print("%-34s %11s %6s %10s %s"
-              % ("compatible", "resolution", "lanes", "clock kHz", "here"))
+              % ("compatible", "resolution", "lanes", "clock kHz", "status"))
+        tested = 0
         for e in sorted(entries, key=lambda e: e["compatible"]):
-            ours = ours_by_compatible(e["compatible"]) or ""
-            print("%-34s %11s %6d %10d %s"
+            ours = ours_by_compatible(e["compatible"])
+            if ours:
+                tested += 1
+                status = "%s (%s)" % (ours[0], ours[1])
+            else:
+                status = "UNTESTED here"
+            print("%-34s %11s %6d %10d  %s"
                   % (e["compatible"], "%dx%d" % (e["w"], e["h"]),
-                     e["lanes"], e["clock"], ours))
-        print("\n%d entries in this driver." % len(entries))
+                     e["lanes"], e["clock"], status))
+        print("")
+        print("%d entries; %d driven by a definition here, %d untested."
+              % (len(entries), tested, len(entries) - tested))
+        print("")
+        print("UNTESTED means nobody has put that panel on a bench")
+        print("here. Its mode and initialisation sequence are upstream")
+        print("and would very likely work - but no definition exists,")
+        print("because a definition needs a FINGERPRINT, and that comes")
+        print("from the touch controller, which this driver says nothing")
+        print("about.")
+        print("")
+        print("If you have one, you are most of the way to a .panel file:")
+        print("    sudo tools/capture-panel.sh <your-id>")
         return 0
 
     if a.resolution:
@@ -260,7 +288,8 @@ def main(argv):
         print("    %d lanes, %.1f MHz" % (e["lanes"], e["clock"] / 1000.0))
         print("")
         if ours:
-            print("This repository already drives it: panels/%s.panel" % ours)
+            print("Already covered here: panels/%s.panel - %s"
+                  % (ours[0], ours[1]))
         else:
             print("Not yet in this repository. The derived path should need a")
             print(".panel file and no code:")
@@ -277,7 +306,7 @@ def main(argv):
         ours = ours_by_compatible(e["compatible"])
         print("    %-34s %d lanes  %6.1f MHz%s"
               % (e["compatible"], e["lanes"], e["clock"] / 1000.0,
-                 "   <- already here as %s" % ours if ours else ""))
+                 "   <- %s" % ours[0] if ours else ""))
     clocks = sorted({e["clock"] for e in hits})
     lanes = sorted({e["lanes"] for e in hits})
     print("")

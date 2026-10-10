@@ -371,11 +371,36 @@ set -- $MATCHES
 case $# in
   0)
     say ""
-    # Deliberately no longer suggests picking another definition. An
-    # unrecognised panel is not a panel that any of these definitions will
-    # drive, and forcing one describes hardware that is not there.
-    die "no known panel recognised.
-    Run --scan to see what is on the bus, then see docs/ADDING-A-PANEL.md.
+    warn "no known panel recognised."
+    say ""
+
+    # Not recognised is not the same as unknown. The digitizer still reports
+    # its resolution, and Raspberry Pi's driver holds the mode for seventeen
+    # Waveshare panels - so this can often say WHICH one is plugged in, even
+    # though no definition here describes it yet.
+    #
+    # Deliberately a suggestion and nothing more. No definition is added, none
+    # is installed, and an untested entry is labelled as untested: the point
+    # is to save someone the hunt, not to pretend the panel is supported.
+    if _res=$(probe 0x5d "0x80 0x48" 4 2>/dev/null); then
+        # four bytes, two little-endian 16-bit values
+        # shellcheck disable=SC2086
+        set -- $_res
+        if [ $# -eq 4 ]; then
+            _x=$(( $(printf '%d' "$1") | ($(printf '%d' "$2") << 8) ))
+            _y=$(( $(printf '%d' "$3") | ($(printf '%d' "$4") << 8) ))
+            say "  The touch controller reports a ${_x}x${_y} digitizer, which on"
+            say "  every panel recorded here is the panel's own resolution."
+            say ""
+            if have_cmd python3 && [ -f "$HERE/tools/match-upstream.py" ]; then
+                python3 "$HERE/tools/match-upstream.py" \
+                    --resolution "${_x}x${_y}" 2>/dev/null | sed 's/^/  /' || true
+                say ""
+            fi
+        fi
+    fi
+
+    die "Run --scan to see what is on the bus, then see docs/ADDING-A-PANEL.md.
     Do NOT install another panel's definition to see what happens: it
     describes different hardware, and at best nothing works."
     ;;

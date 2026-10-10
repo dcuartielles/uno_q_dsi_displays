@@ -1,5 +1,59 @@
 # Changelog
 
+## 1.15.1 - 2026-10-10
+
+### Untested upstream panels are named, not silently absent
+
+`match-upstream.py --list` now says which of the seventeen upstream entries
+nobody here has put on a bench: **10 of 17 are untested**. The mode and
+initialisation sequence for those are upstream and would very likely work -
+what is missing is a fingerprint, which comes from the touch controller and is
+something that driver says nothing about.
+
+### Detection suggests a panel when it recognises none
+
+The idea that prompted this was to add provisional "untested" definitions so
+detection would recognise the other upstream panels. It backfires, and the
+reason is worth recording.
+
+A definition needs a fingerprint. Upstream gives the display mode and nothing
+about the touch controller, so the product ID would be a guess. And keying on
+resolution alone is worse than useless: of the seven distinct resolutions
+upstream, **six are already claimed by a panel tested here** - only 800x800 is
+free. Provisional definitions would mostly collide with working panels, and
+detection would start stopping to ask about hardware it identifies correctly
+today. A real loss for a speculative gain.
+
+What costs nothing is making the FAILURE path useful. When no definition
+matches, `detect-panel.sh` now reads the digitizer resolution anyway and says
+which upstream entries could fit:
+
+```
+no known panel recognised.
+
+  The touch controller reports a 800x800 digitizer, which on
+  every panel recorded here is the panel's own resolution.
+
+  UNIQUE MATCH
+      PANEL_DT_COMPATIBLE="waveshare,3.4-dsi-touch-c"
+      2 lanes, 44.3 MHz
+```
+
+Nothing is installed, no definition is added, and panels that work today are
+untouched. It saves the hunt without pretending the panel is supported.
+
+### Fixed: tested panels were reported as untested
+
+`--list` called `waveshare,8.0-dsi-touch-a` untested, which is false - an 8
+inch has been on a bench. It is driven by the kernel's own jadard driver
+rather than by that upstream entry, so its definition never mentions the
+entry and the tool could not see the connection.
+
+The correspondence was already written down in a comment in
+`patch-waveshare-panel.py`. It is now a field, `UPSTREAM_COMPATIBLE`, in the
+three stock definitions - informational only, nothing installs from it - so a
+tool can read what previously only a person could remember.
+
 ## 1.15.0 - 2026-10-10
 
 ### Which upstream panel is this? - `tools/match-upstream.py`

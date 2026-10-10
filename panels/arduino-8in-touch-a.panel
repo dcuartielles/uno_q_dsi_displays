@@ -34,6 +34,13 @@
 # registered, Goodix-TS bound at 0x5d, no DSI errors, and the login screen
 # photographed and checked by eye - not taken on DRM's word, which was wrong.
 
+# The same hardware appears in Raspberry Pi's Waveshare driver as
+# waveshare,8.0-dsi-touch-a. INFORMATIONAL ONLY - this panel is driven by
+# the kernel's own jadard-jd9365da, not by that entry, and nothing
+# installs from this field. It is here so tools can tell that the
+# upstream entry is covered rather than untried.
+UPSTREAM_COMPATIBLE="waveshare,8.0-dsi-touch-a"
+
 PANEL_ID="arduino-8in-touch-a"
 PANEL_DESC="Arduino 8inch DSI-TOUCH-A (800x1280)"
 

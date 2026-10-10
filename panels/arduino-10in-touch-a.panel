@@ -16,6 +16,13 @@
 # 0-0045 registered, Goodix-TS bound at 0x5d, panel lit (checked with a camera,
 # not merely reported by DRM).
 
+# The same hardware appears in Raspberry Pi's Waveshare driver as
+# waveshare,10.1-dsi-touch-a. INFORMATIONAL ONLY - this panel is driven by
+# the kernel's own jadard-jd9365da, not by that entry, and nothing
+# installs from this field. It is here so tools can tell that the
+# upstream entry is covered rather than untried.
+UPSTREAM_COMPATIBLE="waveshare,10.1-dsi-touch-a"
+
 PANEL_ID="arduino-10in-touch-a"
 PANEL_DESC="Arduino 10.1inch DSI-TOUCH-A (800x1280)"
 

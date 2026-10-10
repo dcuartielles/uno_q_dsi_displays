@@ -18,6 +18,13 @@
 # Verified working: connector card0-DSI-1 at 720x1280, backlight registered,
 # "Goodix Capacitive TouchScreen" bound.
 
+# The same hardware appears in Raspberry Pi's Waveshare driver as
+# waveshare,5.0-dsi-touch-a. INFORMATIONAL ONLY - this panel is driven by
+# the kernel's own panel-himax-hx8394, not by that entry, and nothing
+# installs from this field. It is here so tools can tell that the
+# upstream entry is covered rather than untried.
+UPSTREAM_COMPATIBLE="waveshare,5.0-dsi-touch-a"
+
 PANEL_ID="arduino-5in-touch-a"
 PANEL_DESC="Arduino 5inch DSI-TOUCH-A (720x1280)"
 
