@@ -176,64 +176,64 @@ and why the tool stops and asks rather than following a branch.
 ### The run
 
 ```
-   sudo ./scripts/detect-panel.sh
-               |
-               v
-   +-------------------------+   numbering is not stable across boots,
-   |  find the carrier's bus |   so it is found, never assumed
-   +-----------+-------------+
-               v
-   +-------------------------+   probe 12 addresses no panel uses
-   |  is the bus stuck low?  |-- all answer --> STOP
-   +-----------+-------------+                  "THE I2C BUS IS NOT WORKING"
-               | healthy                        power / cable / connector
-               v
-   +-----------------------------------------------+
-   | run EVERY definition's probe chain, separately |
-   |   - every stage must match                     |
-   |   - prefix compare; "|" means alternatives     |
-   +-----------+-----------------------------------+
-               v
-         how many matched?
-               |
-      +--------+---------+----------------+
-      0                  1               2 or more
-      |                  |                |
-    STOP              install         STOP and ask
-  "no known panel"                  (they are not interchangeable,
-                                     so guessing is 50/50 wrong)
+  detect-panel.sh
+       |
+       v
+  find the carrier's I2C bus
+       |     bus numbering is not stable across boots,
+       |     so it is found, never assumed
+       v
+  is the bus stuck low? --- yes ---> STOP
+       |                  "THE I2C BUS IS NOT WORKING"
+       | no               power / cable / connector
+       v
+  run EVERY definition's probe chain,
+  independently; all stages must match
+       |
+       v
+  how many matched?
+       |
+       +-- 0 ---->  STOP
+       |            "no known panel recognised"
+       |
+       +-- 1 ---->  install it
+       |
+       +-- 2+ --->  STOP and ask
+                    not interchangeable, so a
+                    guess is 50/50 wrong
 ```
 
 ### What the bytes say
 
 ```
-                      WHICH CHIP ANSWERS?
-                              |
-          +-------------------+--------------------+
-          |                                        |
-   0x45 REG_ID (0x80)                   0x5d product ID (0x8140)
-          |                                        |
-      c3 or de                      +--------------+--------------+
-          |                         |                             |
-  waveshare-800x480              "911"                         "9271"
-  (4.3in + 5in, LCD line)           |                             |
-                           0x8048 resolution            0x8053 thresholds
-                                    |                             |
-                        +-----------+--------+        +------+----+----+------+
-                        |                    |        |      |         |      |
-                   720 x 1280          1024 x 600   5f 41  50 32     64 32  64 46
-                        |                    |        |      |         |      |
-                  arduino-5in        waveshare-7in   8in   AMBIGUOUS  12.3in 4.0in C
-                   (TOUCH-A)           (TOUCH-C)  (TOUCH-A)   |      (TOUCH-A)(TOUCH-C)
-                                                              |
-                                                     0x8048 resolution
-                                                              |
-                                                  +-----------+-----------+
-                                                  |                       |
-                                             800 x 1280             480 x 1920
-                                                  |                       |
-                                           arduino-10in           waveshare-8in8
-                                             (TOUCH-A)              (TOUCH-A)
+0x45   REG_ID (0x80)
+  |
+  +-- c3 or de ....... waveshare-800x480
+  |                    (4.3in + 5in, LCD line)
+  +-- anything else .. not the LCD line
+
+
+0x5d   product ID (0x8140)
+  |
+  +-- "911" --> 0x8048 resolution
+  |      |
+  |      +-- 720 x 1280 ... arduino-5in-touch-a
+  |      +-- 1024 x 600 ... waveshare-7in-touch-c
+  |
+  +-- "9271" --> 0x8053 thresholds
+         |
+         +-- 5f 41 ....... arduino-8in-touch-a
+         +-- 64 32 ....... arduino-12in-touch-a
+         +-- 64 46 ....... waveshare-4in-touch-c
+         |
+         +-- 50 32 ....... AMBIGUOUS, needs one more
+                |
+                +-- 0x8048 resolution
+                       |
+                       +-- 800 x 1280 ...
+                       |     arduino-10in-touch-a
+                       +-- 480 x 1920 ...
+                             waveshare-8in8-touch-a
 ```
 
 Three things the shape tells you.
